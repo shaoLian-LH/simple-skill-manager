@@ -61,6 +61,53 @@ describe('project activation and maintenance', () => {
     });
   });
 
+  it('can enable a second skill even when another skill uses loose frontmatter syntax', async () => {
+    await withTempDir('skm-home-', async (homeDir) => {
+      await withTempDir('skm-project-', async (projectDir) => {
+        const skillsDir = path.join(homeDir, 'skills-registry');
+        await createSkillFixtures(skillsDir, [
+          { dirName: 'brainstorming', name: 'brainstorming' },
+          { dirName: 'code-review-process', name: 'code-review-process' },
+        ]);
+
+        const looseSkillDir = path.join(skillsDir, 'translate-non-zh-article');
+        await fs.mkdir(looseSkillDir, { recursive: true });
+        await fs.writeFile(
+          path.join(looseSkillDir, 'SKILL.md'),
+          [
+            '---',
+            'name: translate-non-zh-article',
+            'description: Translate non-Chinese articles with three modes: quick, normal, and refined.',
+            'version: 2.0.0',
+            '---',
+            '',
+            '# Translate Non-Zh Article',
+          ].join('\n'),
+          'utf8',
+        );
+
+        await initConfigWithSkills(homeDir, skillsDir);
+
+        await runCli(['enable', 'skill', 'brainstorming', '--target', '.agents'], {
+          cwd: projectDir,
+          env: { HOME: homeDir },
+        });
+        await runCli(['enable', 'skill', 'code-review-process', '--target', '.agents'], {
+          cwd: projectDir,
+          env: { HOME: homeDir },
+        });
+
+        const state = (await readProjectState(projectDir)) as {
+          enabledSkills: string[];
+          targets: Record<string, { skills: Record<string, unknown> }>;
+        };
+
+        expect(state.enabledSkills).toEqual(['brainstorming', 'code-review-process']);
+        expect(Object.keys(state.targets['.agents']!.skills).sort()).toEqual(['brainstorming', 'code-review-process']);
+      });
+    });
+  });
+
   it('fails when the target path is already occupied by an unknown entry', async () => {
     await withTempDir('skm-home-', async (homeDir) => {
       await withTempDir('skm-project-', async (projectDir) => {

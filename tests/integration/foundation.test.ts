@@ -85,6 +85,47 @@ describe('foundation CLI', () => {
     });
   });
 
+  it('accepts a skill description that contains an unquoted colon-space sequence', async () => {
+    await withTempDir('skm-home-', async (homeDir) => {
+      const skillsDir = path.join(homeDir, 'skills-registry');
+      const skillDir = path.join(skillsDir, 'translate-non-zh-article');
+      await fs.mkdir(skillDir, { recursive: true });
+      await fs.writeFile(
+        path.join(skillDir, 'SKILL.md'),
+        [
+          '---',
+          'name: translate-non-zh-article',
+          'description: Translate non-Chinese articles with three modes: quick, normal, and refined.',
+          'version: 2.0.0',
+          '---',
+          '',
+          '# Translate Non-Zh Article',
+        ].join('\n'),
+        'utf8',
+      );
+      await initConfigWithSkills(homeDir, skillsDir);
+
+      const list = await runCli(['skill', 'list'], { env: { HOME: homeDir } });
+      const inspect = await runCli(['skill', 'inspect', 'translate-non-zh-article'], { env: { HOME: homeDir } });
+
+      expect(JSON.parse(list.stdout)).toEqual([
+        {
+          name: 'translate-non-zh-article',
+          path: path.join(skillsDir, 'translate-non-zh-article'),
+          description: 'Translate non-Chinese articles with three modes: quick, normal, and refined.',
+        },
+      ]);
+      expect(JSON.parse(inspect.stdout)).toMatchObject({
+        name: 'translate-non-zh-article',
+        description: 'Translate non-Chinese articles with three modes: quick, normal, and refined.',
+        frontmatter: {
+          name: 'translate-non-zh-article',
+          version: '2.0.0',
+        },
+      });
+    });
+  });
+
   it('reads preset mappings and fails clearly on invalid yaml', async () => {
     await withTempDir('skm-home-', async (homeDir) => {
       await initConfig(homeDir);

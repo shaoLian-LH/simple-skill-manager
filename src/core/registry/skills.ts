@@ -1,7 +1,7 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 
-import matter from 'gray-matter';
+import YAML from 'yaml';
 
 import { SkmError } from '../errors.js';
 import type { SkillDefinition } from '../types.js';
@@ -21,6 +21,104 @@ function createBodyPreview(body: string): string {
     .join('\n');
 }
 
+interface ParsedSkillMatter {
+  data: Record<string, unknown>;
+  content: string;
+}
+
+function extractFrontmatterBlock(raw: string): { frontmatter: string; content: string } | null {
+  const match = raw.match(/^---[ \t]*\r?\n([\s\S]*?)\r?\n---[ \t]*(?:\r?\n|$)/);
+  if (!match) {
+    return null;
+  }
+
+  return {
+    frontmatter: match[1] ?? '',
+    content: raw.slice(match[0].length),
+  };
+}
+
+function sanitizeYamlFrontmatter(frontmatter: string): string {
+  return frontmatter
+    .split(/\r?\n/)
+    .map((line) => {
+      const match = line.match(/^(\s*)([A-Za-z0-9_-]+):(.*)$/);
+      if (!match) {
+        return line;
+      }
+
+      const [, indent = '', key = '', remainder = ''] = match;
+      const trimmedValue = remainder.trim();
+      if (trimmedValue.length === 0) {
+        return line;
+      }
+
+      if (/^["'[{|>!&*]/.test(trimmedValue)) {
+        return line;
+      }
+
+      if (!trimmedValue.includes(': ')) {
+        return line;
+      }
+
+      return `${indent}${key}: ${JSON.stringify(trimmedValue)}`;
+    })
+    .join('\n');
+}
+
+function parseLooseFrontmatter(raw: string, skillFilePath: string, originalError: unknown): ParsedSkillMatter {
+  const extracted = extractFrontmatterBlock(raw);
+  if (!extracted) {
+    throw new SkmError('config', `Skill file ${toDisplayPath(skillFilePath)} has invalid frontmatter.`, {
+      details: originalError instanceof Error ? originalError.message : String(originalError),
+      hint: 'Fix the YAML frontmatter so `SKILL.md` starts with a valid `---` block.',
+      cause: originalError,
+    });
+  }
+
+  try {
+    const parsed = YAML.parse(sanitizeYamlFrontmatter(extracted.frontmatter)) ?? {};
+    if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+      throw new Error('Frontmatter must parse to an object.');
+    }
+
+    return {
+      data: parsed as Record<string, unknown>,
+      content: extracted.content,
+    };
+  } catch {
+    throw new SkmError('config', `Skill file ${toDisplayPath(skillFilePath)} has invalid frontmatter.`, {
+      details: originalError instanceof Error ? originalError.message : String(originalError),
+      hint: 'Quote frontmatter values that contain `: ` or repair the YAML syntax.',
+      cause: originalError,
+    });
+  }
+}
+
+function parseSkillMatter(raw: string, skillFilePath: string): ParsedSkillMatter {
+  const extracted = extractFrontmatterBlock(raw);
+  if (!extracted) {
+    return {
+      data: {},
+      content: raw,
+    };
+  }
+
+  try {
+    const parsed = YAML.parse(extracted.frontmatter) ?? {};
+    if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+      throw new Error('Frontmatter must parse to an object.');
+    }
+
+    return {
+      data: parsed as Record<string, unknown>,
+      content: extracted.content,
+    };
+  } catch (error) {
+    return parseLooseFrontmatter(raw, skillFilePath, error);
+  }
+}
+
 async function readSkillFromDir(dirPath: string): Promise<SkillDefinition | null> {
   const skillFilePath = path.join(dirPath, 'SKILL.md');
 
@@ -31,7 +129,7 @@ async function readSkillFromDir(dirPath: string): Promise<SkillDefinition | null
     return null;
   }
 
-  const parsed = matter(raw);
+  const parsed = parseSkillMatter(raw, skillFilePath);
   const name = parsed.data.name;
   if (typeof name !== 'string' || name.trim().length === 0) {
     throw new SkmError('config', `Skill file ${toDisplayPath(skillFilePath)} is missing a frontmatter \`name\`.`, {

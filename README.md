@@ -22,70 +22,118 @@ node dist/skm.js --help
 
 The packaged CLI entry is exposed through `package.json#bin` as `skm`.
 
-## Global initialization
+## Examples
 
-Initialize the global config directory under `~/.simple-skill-manager/`:
+### 1. Initialize `skm` and set or update the global skills directory
+
+First initialize the global config directory under `~/.simple-skill-manager/`:
 
 ```bash
 skm config init
 ```
 
-Set the directory that contains your global skills repository:
+Then point `skm` at the directory that contains your global skills repository:
 
 ```bash
 skm config set skills-dir ~/my-skills
 ```
 
-Inspect the resulting configuration:
+If you later move to a different skills repository, run the same command again with the new path:
+
+```bash
+skm config set skills-dir /path/to/another-skill-repo
+```
+
+Inspect the effective config:
 
 ```bash
 skm config get
 ```
 
-## Skill and preset discovery
-
-List and inspect discovered skills:
+Inspect the skills discovered from the configured repository:
 
 ```bash
 skm skill list
 skm skill inspect brainstorming
 ```
 
-List and inspect presets from `~/.simple-skill-manager/presets.yaml`:
+### 2. Configure presets and understand how a preset decides its skills
+
+Presets are global definitions stored in `~/.simple-skill-manager/presets.yaml`.
+
+Each preset is a simple mapping:
+- key = preset name
+- value = list of skill names
+
+Example:
+
+```yaml
+frontend-basic:
+  - brainstorming
+  - test-engineer
+
+researcher:
+  - deep-research
+  - url-to-markdown
+```
+
+In this model:
+- enabling `frontend-basic` means enabling `brainstorming` and `test-engineer`
+- enabling `researcher` means enabling `deep-research` and `url-to-markdown`
+- presets do not contain paths or targets; they only decide which skill names should be expanded
+
+After editing `presets.yaml`, inspect what `skm` sees:
 
 ```bash
 skm preset list
 skm preset inspect frontend-basic
+skm preset inspect researcher
 ```
 
-## Project workflow
+### 3. Enable or disable a preset or skill inside a project
 
-Enable a single skill into one or more targets:
+Inside a project directory, enable a single skill:
 
 ```bash
 skm enable skill brainstorming --target .agents
+```
+
+Enable a single skill into multiple targets:
+
+```bash
 skm enable skill brainstorming --target .agents --target .trae
 ```
 
-Enable a preset:
+Enable a preset, which expands to the skills listed in `presets.yaml`:
 
 ```bash
 skm enable preset frontend-basic --target .agents
 ```
 
-Disable a skill or preset:
+Disable a single explicitly enabled skill:
 
 ```bash
 skm disable skill brainstorming
+```
+
+Disable a preset:
+
+```bash
 skm disable preset frontend-basic
 ```
 
-Inspect and repair project drift:
+Check and repair project drift:
 
 ```bash
 skm doctor
 skm sync
 ```
+
+When `enable` runs, `skm` will:
+- create or update `.skm/state.json`
+- append `.skm` to `.gitignore` if needed
+- install skills into `.agents/skills/<name>` or `.trae/skills/<name>`
+- update the global mirror index in `~/.simple-skill-manager/projects.json`
 
 ## State files
 
