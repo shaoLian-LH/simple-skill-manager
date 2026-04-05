@@ -60,13 +60,15 @@ export type DoctorIssueType =
   | 'unexpected-target-entry'
   | 'broken-link'
   | 'copied-skill-may-have-drifted'
-  | 'stale-global-index';
+  | 'stale-global-index'
+  | 'missing-preset-definition';
 
 export interface DoctorIssue {
   type: DoctorIssueType;
   message: string;
   target?: TargetName;
   skillName?: string;
+  presetName?: string;
   path?: string;
   expectedPath?: string;
 }

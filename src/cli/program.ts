@@ -1,26 +1,46 @@
 import { Command, CommanderError } from 'commander';
 
 import {
+  disablePresets,
+  disableSkills,
   doctorProject,
-  disablePreset,
-  disableSkill,
-  enablePreset,
-  enableSkill,
+  enablePresets,
+  enableSkills,
   syncProject,
 } from '../core/activation/service.js';
-import { ExitCode, SkmError, formatError } from '../core/errors.js';
 import { loadConfig, initGlobalConfig, setSkillsDir } from '../core/config/service.js';
-import { getPresetByName, listPresets } from '../core/registry/presets.js';
-import { getSkillByName, listSkills, toSkillInspectView } from '../core/registry/skills.js';
+import { ExitCode, SkmError, formatError } from '../core/errors.js';
 import { renderJson, renderMessage } from '../core/output/render.js';
+import { findPresetReferences, getPresetByName, listPresets, addPresetDefinition, deletePresetDefinition, updatePresetDefinition } from '../core/registry/presets.js';
+import { getSkillByName, listSkills, toSkillInspectView } from '../core/registry/skills.js';
+import { loadProjectState } from '../core/state/project-state.js';
 import { toDisplayPath } from '../core/utils/path.js';
+import { PromptCancelledError, type PromptAdapter, TtyPromptAdapter } from './interactive/adapter.js';
+import { collectMany, collectSingle, collectTargets, ensurePromptable } from './interactive/collector.js';
 
 function printStdout(payload: string): void {
   process.stdout.write(payload);
 }
 
-function collectTargets(value: string, previous: string[]): string[] {
+function printStderr(payload: string): void {
+  process.stderr.write(payload);
+}
+
+function collectTargetsOption(value: string, previous: string[]): string[] {
   return [...previous, value];
+}
+
+function stableUnique(values: string[]): string[] {
+  const seen = new Set<string>();
+  const next: string[] = [];
+  for (const value of values.map((entry) => entry.trim()).filter((entry) => entry.length > 0)) {
+    if (seen.has(value)) {
+      continue;
+    }
+    seen.add(value);
+    next.push(value);
+  }
+  return next;
 }
 
 async function withLoadedConfig<T>(callback: (skillsDir: string) => Promise<T>): Promise<T> {
@@ -28,8 +48,15 @@ async function withLoadedConfig<T>(callback: (skillsDir: string) => Promise<T>):
   return callback(config.skillsDir);
 }
 
-function createProgram(): Command {
+export interface CliDependencies {
+  promptAdapter?: PromptAdapter;
+  isInteractiveSession?: () => boolean;
+}
+
+function createProgram(deps: CliDependencies = {}): Command {
   const program = new Command();
+  const prompt = deps.promptAdapter ?? new TtyPromptAdapter();
+  const canPrompt = deps.isInteractiveSession ?? (() => Boolean(process.stdin.isTTY && process.stdout.isTTY));
 
   program
     .name('skm')
@@ -71,7 +98,7 @@ function createProgram(): Command {
       printStdout(renderJson(config));
     });
 
-  const skillCommand = program.command('skill').description('Inspect globally available skills.');
+  const skillCommand = program.command('skill').description('Inspect and manage globally available skills in this project.');
 
   skillCommand
     .command('list')
@@ -90,14 +117,102 @@ function createProgram(): Command {
     });
 
   skillCommand
-    .command('inspect <name>')
+    .command('inspect [name]')
     .description('Show the source path, frontmatter, and preview for a skill.')
-    .action(async (name: string) => {
-      const skill = await withLoadedConfig((skillsDir) => getSkillByName(skillsDir, name));
+    .action(async (name: string | undefined) => {
+      const availableSkills = await withLoadedConfig((skillsDir) => listSkills(skillsDir));
+      if (!name && availableSkills.length === 0) {
+        printStdout(renderMessage('No skills are available to inspect.'));
+        return;
+      }
+      const collected = await collectSingle(
+        { canPrompt: canPrompt(), prompt },
+        name,
+        availableSkills.map((skill) => skill.name),
+        'Select a skill to inspect',
+        'Skill name is required in non-interactive mode.',
+        'Run `skm skill inspect <name>`.',
+      );
+      const skill = await withLoadedConfig((skillsDir) => getSkillByName(skillsDir, collected.value));
       printStdout(renderJson(toSkillInspectView(skill)));
     });
 
-  const presetCommand = program.command('preset').description('Inspect globally configured skill presets.');
+  skillCommand
+    .command('enable [names...]')
+    .description('Enable one or more skills in the current project and install them into selected targets.')
+    .option('-t, --target <target>', 'Target root to install into. Repeat to install into multiple targets.', collectTargetsOption, [])
+    .action(async (names: string[] | undefined, options: { target: string[] }) => {
+      const availableSkills = await withLoadedConfig((skillsDir) => listSkills(skillsDir));
+      if ((!names || names.length === 0) && availableSkills.length === 0) {
+        printStdout(renderMessage('No skills are available to enable.'));
+        return;
+      }
+      const selectedSkills = await collectMany(
+        { canPrompt: canPrompt(), prompt },
+        names,
+        availableSkills.map((skill) => skill.name),
+        'Select skills to enable',
+        'At least one skill name is required in non-interactive mode.',
+        'Run `skm skill enable <name...> --target <target>`.',
+      );
+
+      const { config } = await loadConfig();
+      const previousState = await loadProjectState(process.cwd());
+      const defaultTargets = previousState && Object.keys(previousState.targets).length > 0 ? Object.keys(previousState.targets) : config.defaultTargets;
+      const selectedTargets = await collectTargets({ canPrompt: canPrompt(), prompt }, options.target, defaultTargets);
+
+      if (selectedSkills.usedPrompt || selectedTargets.usedPrompt) {
+        const confirmed = await prompt.confirm(
+          `Enable skills [${selectedSkills.values.join(', ')}] with targets [${(selectedTargets.targets.length > 0 ? selectedTargets.targets : defaultTargets).join(', ')}]?`,
+        );
+        if (!confirmed) {
+          throw new PromptCancelledError();
+        }
+      }
+
+      const state = await enableSkills({
+        projectPath: process.cwd(),
+        skillNames: selectedSkills.values,
+        targets: selectedTargets.targets,
+      });
+      printStdout(renderJson(state));
+    });
+
+  skillCommand
+    .command('disable [names...]')
+    .description('Disable one or more explicitly enabled skills in the current project.')
+    .action(async (names: string[] | undefined) => {
+      const previousState = await loadProjectState(process.cwd());
+      const enabledSkills = previousState?.enabledSkills ?? [];
+      const selected = await collectMany(
+        { canPrompt: canPrompt(), prompt },
+        names,
+        enabledSkills,
+        'Select skills to disable',
+        'At least one skill name is required in non-interactive mode.',
+        'Run `skm skill disable <name...>`.',
+      );
+
+      if (selected.values.length === 0) {
+        printStdout(renderMessage('No enabled skills to disable.'));
+        return;
+      }
+
+      if (selected.usedPrompt) {
+        const confirmed = await prompt.confirm(`Disable skills [${selected.values.join(', ')}]?`);
+        if (!confirmed) {
+          throw new PromptCancelledError();
+        }
+      }
+
+      const state = await disableSkills({
+        projectPath: process.cwd(),
+        skillNames: selected.values,
+      });
+      printStdout(renderJson(state));
+    });
+
+  const presetCommand = program.command('preset').description('Inspect, manage, and apply globally configured skill presets.');
 
   presetCommand
     .command('list')
@@ -114,49 +229,249 @@ function createProgram(): Command {
     });
 
   presetCommand
-    .command('inspect <name>')
+    .command('inspect [name]')
     .description('Expand and print the skills in a preset.')
-    .action(async (name: string) => {
-      const skills = await getPresetByName(name);
-      printStdout(renderJson({ name, skills }));
+    .action(async (name: string | undefined) => {
+      const presets = await listPresets();
+      if (!name && Object.keys(presets).length === 0) {
+        printStdout(renderMessage('No presets are available to inspect.'));
+        return;
+      }
+      const collected = await collectSingle(
+        { canPrompt: canPrompt(), prompt },
+        name,
+        Object.keys(presets).sort((left, right) => left.localeCompare(right)),
+        'Select a preset to inspect',
+        'Preset name is required in non-interactive mode.',
+        'Run `skm preset inspect <name>`.',
+      );
+      const skills = await getPresetByName(collected.value);
+      printStdout(renderJson({ name: collected.value, skills }));
     });
 
-  const enableCommand = program.command('enable').description('Enable a skill or preset in the current project.');
+  presetCommand
+    .command('enable [names...]')
+    .description('Enable one or more presets in the current project and install their skills into selected targets.')
+    .option('-t, --target <target>', 'Target root to install into. Repeat to install into multiple targets.', collectTargetsOption, [])
+    .action(async (names: string[] | undefined, options: { target: string[] }) => {
+      const presets = await listPresets();
+      const selectedPresets = await collectMany(
+        { canPrompt: canPrompt(), prompt },
+        names,
+        Object.keys(presets).sort((left, right) => left.localeCompare(right)),
+        'Select presets to enable',
+        'At least one preset name is required in non-interactive mode.',
+        'Run `skm preset enable <name...> --target <target>`.',
+      );
 
-  enableCommand
-    .command('skill <name>')
-    .description('Enable a skill in the current project and install it into the selected targets.')
-    .option('-t, --target <target>', 'Target root to install into. Repeat to install into multiple targets.', collectTargets, [])
-    .action(async (name: string, options: { target: string[] }) => {
-      const state = await enableSkill(process.cwd(), name, options.target);
+      if (selectedPresets.values.length === 0) {
+        printStdout(renderMessage('No presets are available.'));
+        return;
+      }
+
+      const { config } = await loadConfig();
+      const previousState = await loadProjectState(process.cwd());
+      const defaultTargets = previousState && Object.keys(previousState.targets).length > 0 ? Object.keys(previousState.targets) : config.defaultTargets;
+      const selectedTargets = await collectTargets({ canPrompt: canPrompt(), prompt }, options.target, defaultTargets);
+
+      if (selectedPresets.usedPrompt || selectedTargets.usedPrompt) {
+        const confirmed = await prompt.confirm(
+          `Enable presets [${selectedPresets.values.join(', ')}] with targets [${(selectedTargets.targets.length > 0 ? selectedTargets.targets : defaultTargets).join(', ')}]?`,
+        );
+        if (!confirmed) {
+          throw new PromptCancelledError();
+        }
+      }
+
+      const state = await enablePresets({
+        projectPath: process.cwd(),
+        presetNames: selectedPresets.values,
+        targets: selectedTargets.targets,
+      });
       printStdout(renderJson(state));
     });
 
-  enableCommand
-    .command('preset <name>')
-    .description('Enable a preset in the current project and install its skills into the selected targets.')
-    .option('-t, --target <target>', 'Target root to install into. Repeat to install into multiple targets.', collectTargets, [])
-    .action(async (name: string, options: { target: string[] }) => {
-      const state = await enablePreset(process.cwd(), name, options.target);
+  presetCommand
+    .command('disable [names...]')
+    .description('Disable one or more presets in the current project.')
+    .action(async (names: string[] | undefined) => {
+      const previousState = await loadProjectState(process.cwd());
+      const enabledPresets = previousState?.enabledPresets ?? [];
+      const selected = await collectMany(
+        { canPrompt: canPrompt(), prompt },
+        names,
+        enabledPresets,
+        'Select presets to disable',
+        'At least one preset name is required in non-interactive mode.',
+        'Run `skm preset disable <name...>`.',
+      );
+
+      if (selected.values.length === 0) {
+        printStdout(renderMessage('No enabled presets to disable.'));
+        return;
+      }
+
+      if (selected.usedPrompt) {
+        const confirmed = await prompt.confirm(`Disable presets [${selected.values.join(', ')}]?`);
+        if (!confirmed) {
+          throw new PromptCancelledError();
+        }
+      }
+
+      const state = await disablePresets({
+        projectPath: process.cwd(),
+        presetNames: selected.values,
+      });
       printStdout(renderJson(state));
     });
 
-  const disableCommand = program.command('disable').description('Disable a skill or preset in the current project.');
+  presetCommand
+    .command('add [name] [skills...]')
+    .description('Create a preset with a non-empty list of skills.')
+    .action(async (name: string | undefined, skills: string[] | undefined) => {
+      const promptContext = { canPrompt: canPrompt(), prompt };
+      const availableSkills = await withLoadedConfig((skillsDir) => listSkills(skillsDir));
+      if ((!skills || skills.length === 0) && availableSkills.length === 0) {
+        printStdout(renderMessage('No skills are available to create a preset.'));
+        return;
+      }
 
-  disableCommand
-    .command('skill <name>')
-    .description('Disable a skill in the current project.')
-    .action(async (name: string) => {
-      const state = await disableSkill(process.cwd(), name);
-      printStdout(renderJson(state));
+      const existingPresets = await listPresets();
+      let usedPrompt = false;
+
+      let presetName = name?.trim() ?? '';
+      if (presetName.length === 0) {
+        ensurePromptable(promptContext, 'Preset name is required in non-interactive mode.', 'Run `skm preset add <name> <skill...>`.');
+        usedPrompt = true;
+        while (true) {
+          const candidate = (await prompt.input('Preset name')).trim();
+          if (candidate.length === 0) {
+            continue;
+          }
+          if (existingPresets[candidate]) {
+            printStdout(renderMessage(`Preset ${candidate} already exists.`));
+            continue;
+          }
+          presetName = candidate;
+          break;
+        }
+      }
+
+      const selectedSkills = await collectMany(
+        promptContext,
+        skills,
+        availableSkills.map((skill) => skill.name),
+        'Select skills for the preset',
+        'At least one skill is required in non-interactive mode.',
+        'Run `skm preset add <name> <skill...>`.',
+      );
+      usedPrompt = usedPrompt || selectedSkills.usedPrompt;
+      const normalizedSkills = stableUnique(selectedSkills.values);
+
+      if (usedPrompt) {
+        const confirmed = await prompt.confirm(`Create preset ${presetName} with skills [${normalizedSkills.join(', ')}]?`);
+        if (!confirmed) {
+          throw new PromptCancelledError();
+        }
+      }
+
+      const created = await addPresetDefinition({ name: presetName, skills: normalizedSkills });
+      printStdout(renderJson(created));
     });
 
-  disableCommand
-    .command('preset <name>')
-    .description('Disable a preset in the current project.')
-    .action(async (name: string) => {
-      const state = await disablePreset(process.cwd(), name);
-      printStdout(renderJson(state));
+  presetCommand
+    .command('update [name] [skills...]')
+    .description('Replace an existing preset definition with the provided full skill list.')
+    .action(async (name: string | undefined, skills: string[] | undefined) => {
+      const promptContext = { canPrompt: canPrompt(), prompt };
+      const availableSkills = await withLoadedConfig((skillsDir) => listSkills(skillsDir));
+      if ((!skills || skills.length === 0) && availableSkills.length === 0) {
+        printStdout(renderMessage('No skills are available to update preset definitions.'));
+        return;
+      }
+
+      const presets = await listPresets();
+      if (!name && Object.keys(presets).length === 0) {
+        printStdout(renderMessage('No presets are available to update.'));
+        return;
+      }
+      let usedPrompt = false;
+
+      const collectedName = await collectSingle(
+        promptContext,
+        name,
+        Object.keys(presets).sort((left, right) => left.localeCompare(right)),
+        'Select a preset to update',
+        'Preset name is required in non-interactive mode.',
+        'Run `skm preset update <name> <skill...>`.',
+      );
+      usedPrompt = usedPrompt || collectedName.usedPrompt;
+
+      const selectedSkills = await collectMany(
+        promptContext,
+        skills,
+        availableSkills.map((skill) => skill.name),
+        'Select replacement skills for the preset',
+        'At least one skill is required in non-interactive mode.',
+        'Run `skm preset update <name> <skill...>`.',
+        presets[collectedName.value] ?? [],
+      );
+      usedPrompt = usedPrompt || selectedSkills.usedPrompt;
+      const normalizedSkills = stableUnique(selectedSkills.values);
+
+      if (usedPrompt) {
+        const confirmed = await prompt.confirm(`Update preset ${collectedName.value} with skills [${normalizedSkills.join(', ')}]?`);
+        if (!confirmed) {
+          throw new PromptCancelledError();
+        }
+      }
+
+      const updated = await updatePresetDefinition({ name: collectedName.value, skills: normalizedSkills });
+      printStdout(renderJson(updated));
+    });
+
+  presetCommand
+    .command('delete [name]')
+    .description('Delete a preset definition from global presets.yaml.')
+    .action(async (name: string | undefined) => {
+      const promptContext = { canPrompt: canPrompt(), prompt };
+      const presets = await listPresets();
+      if (!name && Object.keys(presets).length === 0) {
+        printStdout(renderMessage('No presets are available to delete.'));
+        return;
+      }
+      const collected = await collectSingle(
+        promptContext,
+        name,
+        Object.keys(presets).sort((left, right) => left.localeCompare(right)),
+        'Select a preset to delete',
+        'Preset name is required in non-interactive mode.',
+        'Run `skm preset delete <name>`.',
+      );
+      const references = await findPresetReferences(collected.value);
+
+      if (references.length > 0) {
+        const warning = `Preset ${collected.value} is still referenced by ${references.length} project(s).`;
+        if (collected.usedPrompt) {
+          printStderr(renderMessage(`Warning: ${warning}`));
+          const confirmedReferenced = await prompt.confirm('Delete it anyway?');
+          if (!confirmedReferenced) {
+            throw new PromptCancelledError();
+          }
+        } else {
+          printStderr(renderMessage(`Warning: ${warning}`));
+        }
+      }
+
+      if (collected.usedPrompt) {
+        const confirmed = await prompt.confirm(`Delete preset ${collected.value}?`);
+        if (!confirmed) {
+          throw new PromptCancelledError();
+        }
+      }
+
+      await deletePresetDefinition(collected.value);
+      printStdout(renderJson({ name: collected.value, referencedProjects: references.length, deleted: true }));
     });
 
   program
@@ -169,7 +484,7 @@ function createProgram(): Command {
 
   program
     .command('doctor')
-    .description('Inspect project state drift, missing sources, and stale global index entries.')
+    .description('Inspect project state drift, missing sources, stale index, and missing preset definitions.')
     .action(async () => {
       const issues = await doctorProject(process.cwd());
       printStdout(renderJson({ ok: issues.length === 0, issues }));
@@ -178,24 +493,29 @@ function createProgram(): Command {
   return program;
 }
 
-export async function runCli(argv = process.argv): Promise<number> {
-  const program = createProgram();
+export async function runCli(argv = process.argv, deps: CliDependencies = {}): Promise<number> {
+  const program = createProgram(deps);
 
   try {
     await program.parseAsync(argv);
     return ExitCode.Success;
   } catch (error) {
+    if (error instanceof PromptCancelledError) {
+      printStdout(renderMessage('Cancelled.'));
+      return ExitCode.Success;
+    }
+
     if (error instanceof CommanderError) {
       if (error.code === 'commander.helpDisplayed') {
         return ExitCode.Success;
       }
 
       const wrapped = new SkmError('usage', error.message);
-      process.stderr.write(renderMessage(formatError(wrapped)));
+      printStderr(renderMessage(formatError(wrapped)));
       return wrapped.exitCode;
     }
 
-    process.stderr.write(renderMessage(formatError(error)));
+    printStderr(renderMessage(formatError(error)));
     if (error instanceof SkmError) {
       return error.exitCode;
     }

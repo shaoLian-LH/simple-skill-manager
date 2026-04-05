@@ -31,6 +31,13 @@ export async function writeJsonFileAtomic(filePath: string, value: unknown): Pro
   await fs.rename(tempPath, filePath);
 }
 
+export async function writeTextFileAtomic(filePath: string, content: string): Promise<void> {
+  await ensureDir(path.dirname(filePath));
+  const tempPath = `${filePath}.${process.pid}.${Date.now()}.tmp`;
+  await fs.writeFile(tempPath, content, 'utf8');
+  await fs.rename(tempPath, filePath);
+}
+
 export async function writeTextFileIfMissing(filePath: string, content: string): Promise<boolean> {
   if (await pathExists(filePath)) {
     return false;

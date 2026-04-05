@@ -12,9 +12,9 @@ import {
   restoreInstallChanges,
 } from '../install/installer.js';
 import { assertSupportedTargets } from '../install/targets.js';
-import { ensureProjectGitignore } from '../project/gitignore.js';
 import { createProjectIndexEntry, loadProjectsIndex, mirrorProjectState, saveProjectsIndex } from '../project/projects-index.js';
-import { getPresetByName, listPresets } from '../registry/presets.js';
+import { ensureProjectGitignore } from '../project/gitignore.js';
+import { listPresets } from '../registry/presets.js';
 import { getSkillByName } from '../registry/skills.js';
 import { createEmptyProjectState, ensureProjectStateDir, getProjectStatePath, loadProjectState, saveProjectState } from '../state/project-state.js';
 import type { Config, DoctorIssue, ProjectIndexEntry, ProjectState, SkillDefinition, TargetName } from '../types.js';
@@ -22,12 +22,35 @@ import { uniqueSorted } from '../utils/collection.js';
 import { pathExists, removePath } from '../utils/fs.js';
 import { nowIso } from '../utils/time.js';
 
+export interface EnableSkillsRequest {
+  projectPath: string;
+  skillNames: string[];
+  targets: string[];
+}
+
+export interface DisableSkillsRequest {
+  projectPath: string;
+  skillNames: string[];
+}
+
+export interface EnablePresetsRequest {
+  projectPath: string;
+  presetNames: string[];
+  targets: string[];
+}
+
+export interface DisablePresetsRequest {
+  projectPath: string;
+  presetNames: string[];
+}
+
 interface ProjectContext {
   projectPath: string;
   config: Config;
   previousState: ProjectState;
   hadPreviousState: boolean;
   projectsFilePath: string;
+  presetsFilePath: string;
 }
 
 function getExistingTargets(state: ProjectState): TargetName[] {
@@ -59,7 +82,24 @@ async function buildProjectContext(projectPath: string): Promise<ProjectContext>
     previousState: existingState ?? createEmptyProjectState(projectPath),
     hadPreviousState: existingState !== null,
     projectsFilePath: paths.projectsFile,
+    presetsFilePath: paths.presetsFile,
   };
+}
+
+function collectMissingPresetNames(presetNames: string[], presets: Record<string, string[]>): string[] {
+  return uniqueSorted(presetNames.filter((name) => !presets[name]));
+}
+
+function assertNoMissingPresetDefinitions(presetNames: string[], presets: Record<string, string[]>, operation: string): void {
+  const missing = collectMissingPresetNames(presetNames, presets);
+  if (missing.length === 0) {
+    return;
+  }
+
+  throw new SkmError('config', `Preset definitions are missing for ${missing.join(', ')}.`, {
+    details: `Failed while ${operation}.`,
+    hint: `Recreate the missing presets or run \`skm preset disable ${missing.join(' ')}\` in this project.`,
+  });
 }
 
 async function resolveSkills(skillsDir: string, names: string[]): Promise<Map<string, SkillDefinition>> {
@@ -70,21 +110,14 @@ async function resolveSkills(skillsDir: string, names: string[]): Promise<Map<st
   return resolved;
 }
 
-async function expandPresetSkills(presetNames: string[]): Promise<string[]> {
-  const presets = await listPresets();
+function expandPresetSkillsFromMap(presetNames: string[], presets: Record<string, string[]>): string[] {
   const skillNames: string[] = [];
-
   for (const presetName of presetNames) {
     const preset = presets[presetName];
-    if (!preset) {
-      throw new SkmError('config', `Preset ${presetName} was not found.`, {
-        hint: 'Check `skm preset list` to see the available presets.',
-      });
+    if (preset) {
+      skillNames.push(...preset);
     }
-
-    skillNames.push(...preset);
   }
-
   return uniqueSorted(skillNames);
 }
 
@@ -171,7 +204,7 @@ async function removeObsoleteInstalls(projectPath: string, previousState: Projec
 async function reconcileState(
   context: ProjectContext,
   nextState: ProjectState,
-  options: { ensureGitignore?: boolean; preserveExistingTargets?: boolean } = {},
+  options: { ensureGitignore?: boolean } = {},
 ): Promise<ProjectState> {
   const previousIndex = await loadProjectsIndex(context.projectsFilePath);
   const previousIndexEntry = previousIndex.projects[context.projectPath];
@@ -213,14 +246,37 @@ async function reconcileState(
   }
 }
 
-export async function enableSkill(projectPath: string, skillName: string, requestedTargets: string[]): Promise<ProjectState> {
-  const context = await buildProjectContext(projectPath);
-  const activeTargets = resolveActiveTargets(requestedTargets, context.config, context.previousState);
-  const enabledSkills = uniqueSorted([...context.previousState.enabledSkills, skillName]);
-  const presetSkills = await expandPresetSkills(context.previousState.enabledPresets);
+function stableUnique(names: string[]): string[] {
+  const seen = new Set<string>();
+  const next: string[] = [];
+  for (const name of names.map((entry) => entry.trim()).filter((entry) => entry.length > 0)) {
+    if (seen.has(name)) {
+      continue;
+    }
+    seen.add(name);
+    next.push(name);
+  }
+  return next;
+}
+
+export async function enableSkills(request: EnableSkillsRequest): Promise<ProjectState> {
+  const skillNames = stableUnique(request.skillNames);
+  if (skillNames.length === 0) {
+    throw new SkmError('usage', 'At least one skill name is required.', {
+      hint: 'Run `skm skill enable <name...>`.',
+    });
+  }
+
+  const context = await buildProjectContext(request.projectPath);
+  const presets = await listPresets();
+  assertNoMissingPresetDefinitions(context.previousState.enabledPresets, presets, 'enabling skills');
+
+  const activeTargets = resolveActiveTargets(request.targets, context.config, context.previousState);
+  const enabledSkills = uniqueSorted([...context.previousState.enabledSkills, ...skillNames]);
+  const presetSkills = expandPresetSkillsFromMap(context.previousState.enabledPresets, presets);
   const resolvedSkills = await resolveSkills(context.config.skillsDir, [...enabledSkills, ...presetSkills]);
   const nextState = buildState(
-    projectPath,
+    request.projectPath,
     context.previousState,
     activeTargets,
     enabledSkills,
@@ -229,61 +285,106 @@ export async function enableSkill(projectPath: string, skillName: string, reques
   );
 
   return reconcileState(context, nextState, { ensureGitignore: true });
+}
+
+export async function disableSkills(request: DisableSkillsRequest): Promise<ProjectState> {
+  const skillNames = stableUnique(request.skillNames);
+  if (skillNames.length === 0) {
+    throw new SkmError('usage', 'At least one skill name is required.', {
+      hint: 'Run `skm skill disable <name...>`.',
+    });
+  }
+
+  const context = await buildProjectContext(request.projectPath);
+  const presets = await listPresets();
+  assertNoMissingPresetDefinitions(context.previousState.enabledPresets, presets, 'disabling skills');
+
+  const enabledSkills = context.previousState.enabledSkills.filter((entry) => !skillNames.includes(entry));
+  const presetSkills = expandPresetSkillsFromMap(context.previousState.enabledPresets, presets);
+  const resolvedSkills = await resolveSkills(context.config.skillsDir, [...enabledSkills, ...presetSkills]);
+  const activeTargets = resolvedSkills.size > 0 ? getExistingTargets(context.previousState) : [];
+  const nextState = buildState(
+    request.projectPath,
+    context.previousState,
+    activeTargets,
+    enabledSkills,
+    context.previousState.enabledPresets,
+    resolvedSkills,
+  );
+
+  return reconcileState(context, nextState);
+}
+
+export async function enablePresets(request: EnablePresetsRequest): Promise<ProjectState> {
+  const presetNames = stableUnique(request.presetNames);
+  if (presetNames.length === 0) {
+    throw new SkmError('usage', 'At least one preset name is required.', {
+      hint: 'Run `skm preset enable <name...>`.',
+    });
+  }
+
+  const context = await buildProjectContext(request.projectPath);
+  const presets = await listPresets();
+  const activeTargets = resolveActiveTargets(request.targets, context.config, context.previousState);
+  const enabledPresets = uniqueSorted([...context.previousState.enabledPresets, ...presetNames]);
+  assertNoMissingPresetDefinitions(enabledPresets, presets, 'enabling presets');
+
+  const presetSkills = expandPresetSkillsFromMap(enabledPresets, presets);
+  const resolvedSkills = await resolveSkills(context.config.skillsDir, [...context.previousState.enabledSkills, ...presetSkills]);
+  const nextState = buildState(
+    request.projectPath,
+    context.previousState,
+    activeTargets,
+    context.previousState.enabledSkills,
+    enabledPresets,
+    resolvedSkills,
+  );
+
+  return reconcileState(context, nextState, { ensureGitignore: true });
+}
+
+export async function disablePresets(request: DisablePresetsRequest): Promise<ProjectState> {
+  const presetNames = stableUnique(request.presetNames);
+  if (presetNames.length === 0) {
+    throw new SkmError('usage', 'At least one preset name is required.', {
+      hint: 'Run `skm preset disable <name...>`.',
+    });
+  }
+
+  const context = await buildProjectContext(request.projectPath);
+  const enabledPresets = context.previousState.enabledPresets.filter((entry) => !presetNames.includes(entry));
+  const presets = await listPresets();
+  assertNoMissingPresetDefinitions(enabledPresets, presets, 'disabling presets');
+
+  const presetSkills = expandPresetSkillsFromMap(enabledPresets, presets);
+  const resolvedSkills = await resolveSkills(context.config.skillsDir, [...context.previousState.enabledSkills, ...presetSkills]);
+  const activeTargets = resolvedSkills.size > 0 ? getExistingTargets(context.previousState) : [];
+  const nextState = buildState(
+    request.projectPath,
+    context.previousState,
+    activeTargets,
+    context.previousState.enabledSkills,
+    enabledPresets,
+    resolvedSkills,
+  );
+
+  return reconcileState(context, nextState);
+}
+
+export async function enableSkill(projectPath: string, skillName: string, requestedTargets: string[]): Promise<ProjectState> {
+  return enableSkills({ projectPath, skillNames: [skillName], targets: requestedTargets });
 }
 
 export async function enablePreset(projectPath: string, presetName: string, requestedTargets: string[]): Promise<ProjectState> {
-  await getPresetByName(presetName);
-  const context = await buildProjectContext(projectPath);
-  const activeTargets = resolveActiveTargets(requestedTargets, context.config, context.previousState);
-  const enabledPresets = uniqueSorted([...context.previousState.enabledPresets, presetName]);
-  const presetSkills = await expandPresetSkills(enabledPresets);
-  const resolvedSkills = await resolveSkills(context.config.skillsDir, [...context.previousState.enabledSkills, ...presetSkills]);
-  const nextState = buildState(
-    projectPath,
-    context.previousState,
-    activeTargets,
-    context.previousState.enabledSkills,
-    enabledPresets,
-    resolvedSkills,
-  );
-
-  return reconcileState(context, nextState, { ensureGitignore: true });
+  return enablePresets({ projectPath, presetNames: [presetName], targets: requestedTargets });
 }
 
 export async function disableSkill(projectPath: string, skillName: string): Promise<ProjectState> {
-  const context = await buildProjectContext(projectPath);
-  const enabledSkills = context.previousState.enabledSkills.filter((entry) => entry !== skillName);
-  const presetSkills = await expandPresetSkills(context.previousState.enabledPresets);
-  const resolvedSkills = await resolveSkills(context.config.skillsDir, [...enabledSkills, ...presetSkills]);
-  const activeTargets = resolvedSkills.size > 0 ? getExistingTargets(context.previousState) : [];
-  const nextState = buildState(
-    projectPath,
-    context.previousState,
-    activeTargets,
-    enabledSkills,
-    context.previousState.enabledPresets,
-    resolvedSkills,
-  );
-
-  return reconcileState(context, nextState);
+  return disableSkills({ projectPath, skillNames: [skillName] });
 }
 
 export async function disablePreset(projectPath: string, presetName: string): Promise<ProjectState> {
-  const context = await buildProjectContext(projectPath);
-  const enabledPresets = context.previousState.enabledPresets.filter((entry) => entry !== presetName);
-  const presetSkills = await expandPresetSkills(enabledPresets);
-  const resolvedSkills = await resolveSkills(context.config.skillsDir, [...context.previousState.enabledSkills, ...presetSkills]);
-  const activeTargets = resolvedSkills.size > 0 ? getExistingTargets(context.previousState) : [];
-  const nextState = buildState(
-    projectPath,
-    context.previousState,
-    activeTargets,
-    context.previousState.enabledSkills,
-    enabledPresets,
-    resolvedSkills,
-  );
-
-  return reconcileState(context, nextState);
+  return disablePresets({ projectPath, presetNames: [presetName] });
 }
 
 function indexEntryEquals(left: ProjectIndexEntry | undefined, right: ProjectIndexEntry): boolean {
@@ -320,13 +421,27 @@ export async function doctorProject(projectPath: string): Promise<DoctorIssue[]>
   const context = await buildProjectContext(projectPath);
   if (!context.hadPreviousState) {
     throw new SkmError('config', 'Project state is missing.', {
-      hint: 'Run `skm enable skill <name>` or `skm enable preset <name>` first.',
+      hint: 'Run `skm skill enable <name>` or `skm preset enable <name>` first.',
     });
   }
 
   const issues: DoctorIssue[] = [];
   const fsModule = await import('node:fs/promises');
   const projectsIndex = await loadProjectsIndex(context.projectsFilePath);
+  const presets = await listPresets();
+
+  for (const presetName of context.previousState.enabledPresets) {
+    if (presets[presetName]) {
+      continue;
+    }
+
+    issues.push({
+      type: 'missing-preset-definition',
+      presetName,
+      path: context.presetsFilePath,
+      message: `Preset ${presetName} is enabled in project state but missing from ${context.presetsFilePath}.`,
+    });
+  }
 
   for (const [target, targetState] of Object.entries(context.previousState.targets) as Array<[TargetName, NonNullable<ProjectState['targets'][TargetName]>]>) {
     for (const [skillName, record] of Object.entries(targetState.skills)) {
@@ -423,6 +538,9 @@ export async function syncProject(projectPath: string): Promise<ProjectState> {
       hint: 'Re-enable the desired skills or presets to recreate `.skm/state.json`.',
     });
   }
+
+  const presets = await listPresets();
+  assertNoMissingPresetDefinitions(context.previousState.enabledPresets, presets, 'syncing the project');
 
   const unexpectedEntries = await detectUnexpectedTargetEntries(projectPath, context.previousState);
   if (unexpectedEntries.length > 0) {

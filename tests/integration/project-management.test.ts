@@ -23,11 +23,11 @@ describe('project activation and maintenance', () => {
         ]);
         await initConfigWithSkills(homeDir, skillsDir);
 
-        await runCli(['enable', 'skill', 'brainstorming', '--target', '.agents'], {
+        await runCli(['skill', 'enable', 'brainstorming', '--target', '.agents'], {
           cwd: projectDir,
           env: { HOME: homeDir },
         });
-        await runCli(['enable', 'skill', 'brainstorming', '--target', '.agents'], {
+        await runCli(['skill', 'enable', 'brainstorming', '--target', '.agents'], {
           cwd: projectDir,
           env: { HOME: homeDir },
         });
@@ -88,11 +88,11 @@ describe('project activation and maintenance', () => {
 
         await initConfigWithSkills(homeDir, skillsDir);
 
-        await runCli(['enable', 'skill', 'brainstorming', '--target', '.agents'], {
+        await runCli(['skill', 'enable', 'brainstorming', '--target', '.agents'], {
           cwd: projectDir,
           env: { HOME: homeDir },
         });
-        await runCli(['enable', 'skill', 'code-review-process', '--target', '.agents'], {
+        await runCli(['skill', 'enable', 'code-review-process', '--target', '.agents'], {
           cwd: projectDir,
           env: { HOME: homeDir },
         });
@@ -120,7 +120,7 @@ describe('project activation and maintenance', () => {
         await fs.mkdir(occupiedPath, { recursive: true });
         await fs.writeFile(path.join(occupiedPath, 'README.txt'), 'occupied', 'utf8');
 
-        const failure = await runCliExpectFailure(['enable', 'skill', 'brainstorming', '--target', '.agents'], {
+        const failure = await runCliExpectFailure(['skill', 'enable', 'brainstorming', '--target', '.agents'], {
           cwd: projectDir,
           env: { HOME: homeDir },
         });
@@ -145,9 +145,9 @@ describe('project activation and maintenance', () => {
           ['frontend-basic:', '  - brainstorming', '  - test-engineer'].join('\n'),
         );
 
-        await runCli(['enable', 'skill', 'brainstorming', '--target', '.agents'], { cwd: projectDir, env: { HOME: homeDir } });
-        await runCli(['enable', 'preset', 'frontend-basic', '--target', '.agents'], { cwd: projectDir, env: { HOME: homeDir } });
-        await runCli(['disable', 'skill', 'brainstorming'], { cwd: projectDir, env: { HOME: homeDir } });
+        await runCli(['skill', 'enable', 'brainstorming', '--target', '.agents'], { cwd: projectDir, env: { HOME: homeDir } });
+        await runCli(['preset', 'enable', 'frontend-basic', '--target', '.agents'], { cwd: projectDir, env: { HOME: homeDir } });
+        await runCli(['skill', 'disable', 'brainstorming'], { cwd: projectDir, env: { HOME: homeDir } });
 
         let state = (await readProjectState(projectDir)) as {
           enabledSkills: string[];
@@ -160,7 +160,7 @@ describe('project activation and maintenance', () => {
         expect(agentTarget).toBeDefined();
         expect(Object.keys(agentTarget!.skills).sort()).toEqual(['brainstorming', 'test-engineer']);
 
-        await runCli(['disable', 'preset', 'frontend-basic'], { cwd: projectDir, env: { HOME: homeDir } });
+        await runCli(['preset', 'disable', 'frontend-basic'], { cwd: projectDir, env: { HOME: homeDir } });
         state = (await readProjectState(projectDir)) as {
           enabledSkills: string[];
           enabledPresets: string[];
@@ -191,7 +191,7 @@ describe('project activation and maintenance', () => {
           ['frontend-basic:', '  - brainstorming', '  - test-engineer'].join('\n'),
         );
 
-        await runCli(['enable', 'preset', 'frontend-basic', '--target', '.agents'], { cwd: projectDir, env: { HOME: homeDir } });
+        await runCli(['preset', 'enable', 'frontend-basic', '--target', '.agents'], { cwd: projectDir, env: { HOME: homeDir } });
         await fs.rm(path.join(projectDir, '.agents', 'skills', 'test-engineer'), { recursive: true, force: true });
 
         const projectsFile = path.join(globalAppDir(homeDir), 'projects.json');

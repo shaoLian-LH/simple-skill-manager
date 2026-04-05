@@ -11,7 +11,7 @@ import {
 } from '../constants.js';
 import { SkmError } from '../errors.js';
 import type { Config, ProjectsIndex } from '../types.js';
-import { ensureDir, pathExists, readJsonFile, writeJsonFileAtomic, writeTextFileIfMissing } from '../utils/fs.js';
+import { ensureDir, pathExists, readJsonFile, writeJsonFileAtomic, writeTextFileAtomic, writeTextFileIfMissing } from '../utils/fs.js';
 import { resolveUserPath, toDisplayPath } from '../utils/path.js';
 import { getGlobalPaths, type GlobalPaths } from './paths.js';
 
@@ -173,4 +173,15 @@ export async function parsePresetYaml(paths?: GlobalPaths): Promise<Record<strin
   }
 
   return presets;
+}
+
+export async function writePresetYaml(presets: Record<string, string[]>, paths?: GlobalPaths): Promise<void> {
+  const resolvedPaths = paths ?? getGlobalPaths();
+  const normalized = Object.fromEntries(
+    Object.entries(presets)
+      .sort(([left], [right]) => left.localeCompare(right))
+      .map(([name, skills]) => [name, [...new Set(skills)].sort((left, right) => left.localeCompare(right))]),
+  );
+  const payload = YAML.stringify(normalized);
+  await writeTextFileAtomic(resolvedPaths.presetsFile, payload.endsWith('\n') ? payload : `${payload}\n`);
 }
