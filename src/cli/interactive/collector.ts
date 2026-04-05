@@ -1,7 +1,7 @@
 import { SkmError } from '../../core/errors.js';
 import type { TargetName } from '../../core/types.js';
 import { SUPPORTED_TARGETS } from '../../core/types.js';
-import type { PromptAdapter } from './adapter.js';
+import type { PromptAdapter, PromptChoice } from './adapter.js';
 
 function stableUnique(values: string[]): string[] {
   const seen = new Set<string>();
@@ -21,6 +21,10 @@ export interface CollectContext {
   prompt: PromptAdapter;
 }
 
+function normalizeChoices(options: Array<string | PromptChoice>): PromptChoice[] {
+  return options.map((option) => (typeof option === 'string' ? { value: option, label: option } : option));
+}
+
 export function ensurePromptable(context: CollectContext, message: string, hint: string): void {
   if (context.canPrompt) {
     return;
@@ -32,7 +36,7 @@ export function ensurePromptable(context: CollectContext, message: string, hint:
 export async function collectSingle(
   context: CollectContext,
   provided: string | undefined,
-  options: string[],
+  options: Array<string | PromptChoice>,
   message: string,
   usageMessage: string,
   usageHint: string,
@@ -42,21 +46,19 @@ export async function collectSingle(
   }
 
   ensurePromptable(context, usageMessage, usageHint);
-  if (options.length === 0) {
+  const choices = normalizeChoices(options);
+  if (choices.length === 0) {
     throw new SkmError('usage', usageMessage, { hint: usageHint });
   }
 
-  const value = await context.prompt.selectOne(
-    message,
-    options.map((entry) => ({ value: entry, label: entry })),
-  );
+  const value = await context.prompt.selectOne(message, choices);
   return { value, usedPrompt: true };
 }
 
 export async function collectMany(
   context: CollectContext,
   provided: string[] | undefined,
-  options: string[],
+  options: Array<string | PromptChoice>,
   message: string,
   usageMessage: string,
   usageHint: string,
@@ -68,15 +70,15 @@ export async function collectMany(
   }
 
   ensurePromptable(context, usageMessage, usageHint);
-  if (options.length === 0) {
+  const choices = normalizeChoices(options);
+  if (choices.length === 0) {
     return { values: [], usedPrompt: true };
   }
 
-  const values = await context.prompt.selectMany(
-    message,
-    options.map((entry) => ({ value: entry, label: entry })),
-    { min: 1, initial: stableUnique(initial) },
-  );
+  const values = await context.prompt.selectMany(message, choices, {
+    min: 1,
+    initial: stableUnique(initial),
+  });
   return { values: stableUnique(values), usedPrompt: true };
 }
 
@@ -96,7 +98,11 @@ export async function collectTargets(
 
   const targets = await context.prompt.selectMany(
     'Select targets',
-    SUPPORTED_TARGETS.map((target) => ({ value: target, label: target })),
+    SUPPORTED_TARGETS.map((target) => ({
+      value: target,
+      label: target,
+      description: `Install skills into ${target}/skills in the current project.`,
+    })),
     { min: 1, initial: stableUnique(initial) },
   );
 

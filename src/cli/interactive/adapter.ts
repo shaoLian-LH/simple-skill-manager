@@ -3,6 +3,7 @@ import { checkbox as checkboxPrompt, confirm as confirmPrompt, input as inputPro
 export interface PromptChoice {
   value: string;
   label: string;
+  description?: string;
 }
 
 export interface PromptAdapter {
@@ -37,13 +38,23 @@ async function runPrompt<T>(factory: () => Promise<T>): Promise<T> {
   }
 }
 
-function toNamedChoices(choices: PromptChoice[]): Array<{ value: string; name: string }> {
-  return choices.map((choice) => ({ value: choice.value, name: choice.label }));
+function toNamedChoices(choices: PromptChoice[]): Array<{ value: string; name: string; short: string }> {
+  return choices.map((choice) => ({
+    value: choice.value,
+    name: formatChoiceLabel(choice),
+    short: choice.label,
+  }));
 }
 
 function normalizeAnswer(answer: string): string {
   return answer.trim();
 }
+
+function formatChoiceLabel(choice: PromptChoice): string {
+  return `${choice.label}`;
+}
+
+const PROMPT_PAGE_SIZE = 20;
 
 export class TtyPromptAdapter implements PromptAdapter {
   async selectOne(message: string, choices: PromptChoice[]): Promise<string> {
@@ -55,6 +66,7 @@ export class TtyPromptAdapter implements PromptAdapter {
       selectPrompt({
         message,
         choices: toNamedChoices(choices),
+        pageSize: PROMPT_PAGE_SIZE,
         theme: { indexMode: 'number' },
       }),
     );
@@ -70,7 +82,11 @@ export class TtyPromptAdapter implements PromptAdapter {
     return runPrompt(() =>
       checkboxPrompt({
         message,
-        choices: choices.map((choice) => ({ value: choice.value, name: choice.label, checked: initial.has(choice.value) })),
+        pageSize: PROMPT_PAGE_SIZE,
+        choices: toNamedChoices(choices).map((choice) => ({
+          ...choice,
+          checked: initial.has(choice.value),
+        })),
         validate: (selected) => (selected.length >= min ? true : `Please select at least ${min} option(s).`),
       }),
     );

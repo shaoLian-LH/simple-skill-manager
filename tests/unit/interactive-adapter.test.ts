@@ -27,7 +27,7 @@ describe('TtyPromptAdapter', () => {
 
     await expect(
       adapter.selectOne('Select a skill to inspect', [
-        { value: 'brainstorming', label: 'brainstorming' },
+        { value: 'brainstorming', label: 'brainstorming', description: 'Generate many candidate ideas quickly.' },
         { value: 'test-engineer', label: 'test-engineer' },
       ]),
     ).resolves.toBe('brainstorming');
@@ -36,9 +36,14 @@ describe('TtyPromptAdapter', () => {
     expect(mockedSelect).toHaveBeenCalledWith({
       message: 'Select a skill to inspect',
       choices: [
-        { value: 'brainstorming', name: 'brainstorming' },
-        { value: 'test-engineer', name: 'test-engineer' },
+        {
+          value: 'brainstorming',
+          name: 'brainstorming',
+          short: 'brainstorming',
+        },
+        { value: 'test-engineer', name: 'test-engineer', short: 'test-engineer' },
       ],
+      pageSize: 20,
       theme: { indexMode: 'number' },
     });
   });
@@ -49,7 +54,7 @@ describe('TtyPromptAdapter', () => {
     const selected = await adapter.selectMany(
       'Select targets',
       [
-        { value: '.agents', label: '.agents' },
+        { value: '.agents', label: '.agents', description: 'Install into .agents/skills.' },
         { value: '.trae', label: '.trae' },
       ],
       { initial: ['.agents'], min: 2 },
@@ -59,9 +64,15 @@ describe('TtyPromptAdapter', () => {
     expect(mockedCheckbox).toHaveBeenCalledOnce();
 
     const config = mockedCheckbox.mock.calls[0]?.[0];
+    expect(config?.pageSize).toBe(20);
     expect(config?.choices).toEqual([
-      { value: '.agents', name: '.agents', checked: true },
-      { value: '.trae', name: '.trae', checked: false },
+      {
+        value: '.agents',
+        name: '.agents',
+        short: '.agents',
+        checked: true,
+      },
+      { value: '.trae', name: '.trae', short: '.trae', checked: false },
     ]);
     expect(await config?.validate?.([] as never[])).toBe('Please select at least 2 option(s).');
     expect(await config?.validate?.([{} as never, {} as never])).toBe(true);

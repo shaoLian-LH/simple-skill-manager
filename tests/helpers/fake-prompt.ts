@@ -1,4 +1,4 @@
-import { PromptCancelledError, type PromptAdapter } from '../../src/cli/interactive/adapter.js';
+import { PromptCancelledError, type PromptAdapter, type PromptChoice } from '../../src/cli/interactive/adapter.js';
 
 interface FakePromptScript {
   selectOne?: string[];
@@ -16,6 +16,12 @@ function shiftOrThrow<T>(queue: T[] | undefined, label: string): T {
 
 export class FakePromptAdapter implements PromptAdapter {
   private readonly script: Required<FakePromptScript>;
+  readonly calls = {
+    selectOne: [] as Array<{ message: string; choices: PromptChoice[] }>,
+    selectMany: [] as Array<{ message: string; choices: PromptChoice[]; options?: { initial?: string[]; min?: number } }>,
+    confirm: [] as Array<{ message: string }>,
+    input: [] as Array<{ message: string; options?: { defaultValue?: string } }>,
+  };
 
   constructor(script: FakePromptScript = {}) {
     this.script = {
@@ -26,7 +32,8 @@ export class FakePromptAdapter implements PromptAdapter {
     };
   }
 
-  async selectOne(): Promise<string> {
+  async selectOne(message: string, choices: PromptChoice[]): Promise<string> {
+    this.calls.selectOne.push({ message, choices });
     const value = shiftOrThrow(this.script.selectOne, 'selectOne');
     if (value === '__cancel__') {
       throw new PromptCancelledError();
@@ -34,7 +41,8 @@ export class FakePromptAdapter implements PromptAdapter {
     return value;
   }
 
-  async selectMany(): Promise<string[]> {
+  async selectMany(message: string, choices: PromptChoice[], options?: { initial?: string[]; min?: number }): Promise<string[]> {
+    this.calls.selectMany.push({ message, choices, options });
     const values = shiftOrThrow(this.script.selectMany, 'selectMany');
     if (values.length === 1 && values[0] === '__cancel__') {
       throw new PromptCancelledError();
@@ -42,11 +50,13 @@ export class FakePromptAdapter implements PromptAdapter {
     return values;
   }
 
-  async confirm(): Promise<boolean> {
+  async confirm(message: string): Promise<boolean> {
+    this.calls.confirm.push({ message });
     return shiftOrThrow(this.script.confirm, 'confirm');
   }
 
-  async input(): Promise<string> {
+  async input(message: string, options?: { defaultValue?: string }): Promise<string> {
+    this.calls.input.push({ message, options });
     const value = shiftOrThrow(this.script.input, 'input');
     if (value === '__cancel__') {
       throw new PromptCancelledError();

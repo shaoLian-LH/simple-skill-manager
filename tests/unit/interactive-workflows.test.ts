@@ -21,8 +21,15 @@ describe('interactive workflows', () => {
     await withTempDir('skm-home-', async (homeDir) => {
       process.env.HOME = homeDir;
       const skillsDir = path.join(homeDir, 'skills-registry');
-      await createSkillFixtures(skillsDir, [{ dirName: 'brainstorming', name: 'brainstorming' }]);
+      await createSkillFixtures(skillsDir, [
+        {
+          dirName: 'brainstorming',
+          name: 'brainstorming',
+          description: 'Generate many candidate ideas quickly.',
+        },
+      ]);
       await initConfigWithSkills(homeDir, skillsDir);
+      const promptAdapter = new FakePromptAdapter({ selectOne: ['brainstorming'] });
 
       let stdout = '';
       vi.spyOn(process.stdout, 'write').mockImplementation((chunk: string | Uint8Array) => {
@@ -31,12 +38,52 @@ describe('interactive workflows', () => {
       });
 
       const exitCode = await runCli(['node', 'skm', 'skill', 'inspect'], {
-        promptAdapter: new FakePromptAdapter({ selectOne: ['brainstorming'] }),
+        promptAdapter,
         isInteractiveSession: () => true,
       });
 
       expect(exitCode).toBe(0);
       expect(JSON.parse(stdout)).toMatchObject({ name: 'brainstorming' });
+      expect(promptAdapter.calls.selectOne[0]?.choices).toEqual([
+        {
+          value: 'brainstorming',
+          label: 'brainstorming',
+          description: 'Generate many candidate ideas quickly.',
+        },
+      ]);
+    });
+  });
+
+  it('shows preset skill lists in interactive preset selection prompts', async () => {
+    await withTempDir('skm-home-', async (homeDir) => {
+      process.env.HOME = homeDir;
+      const skillsDir = path.join(homeDir, 'skills-registry');
+      await createSkillFixtures(skillsDir, [
+        { dirName: 'brainstorming', name: 'brainstorming' },
+        { dirName: 'test-engineer', name: 'test-engineer' },
+      ]);
+      await initConfigWithSkills(homeDir, skillsDir);
+
+      vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
+      await runCli(['node', 'skm', 'preset', 'add', 'frontend-v2', 'brainstorming', 'test-engineer']);
+
+      const promptAdapter = new FakePromptAdapter({ selectOne: ['frontend-v2'] });
+
+      const exitCode = await runCli(['node', 'skm', 'preset', 'inspect'], {
+        promptAdapter,
+        isInteractiveSession: () => true,
+      });
+
+      expect(exitCode).toBe(0);
+      expect(promptAdapter.calls.selectOne[0]?.choices).toEqual(
+        expect.arrayContaining([
+          {
+            value: 'frontend-v2',
+            label: 'frontend-v2',
+            description: '2 skills: brainstorming, test-engineer',
+          },
+        ]),
+      );
     });
   });
 

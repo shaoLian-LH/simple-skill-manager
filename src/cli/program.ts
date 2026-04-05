@@ -15,7 +15,7 @@ import { findPresetReferences, getPresetByName, listPresets, addPresetDefinition
 import { getSkillByName, listSkills, toSkillInspectView } from '../core/registry/skills.js';
 import { loadProjectState } from '../core/state/project-state.js';
 import { toDisplayPath } from '../core/utils/path.js';
-import { PromptCancelledError, type PromptAdapter, TtyPromptAdapter } from './interactive/adapter.js';
+import { PromptCancelledError, type PromptAdapter, type PromptChoice, TtyPromptAdapter } from './interactive/adapter.js';
 import { collectMany, collectSingle, collectTargets, ensurePromptable } from './interactive/collector.js';
 
 function printStdout(payload: string): void {
@@ -41,6 +41,37 @@ function stableUnique(values: string[]): string[] {
     next.push(value);
   }
   return next;
+}
+
+function createNamedChoices(values: string[]): PromptChoice[] {
+  return values.map((value) => ({ value, label: value }));
+}
+
+function createSkillChoices(skills: Array<{ name: string; description: string }>): PromptChoice[] {
+  return skills.map((skill) => ({
+    value: skill.name,
+    label: skill.name,
+    description: skill.description,
+  }));
+}
+
+function formatPresetChoiceDescription(skills: string[]): string {
+  if (skills.length === 0) {
+    return 'No skills configured.';
+  }
+
+  const skillLabel = skills.length === 1 ? '1 skill' : `${skills.length} skills`;
+  return `${skillLabel}: ${skills.join(', ')}`;
+}
+
+function createPresetChoices(presets: Record<string, string[]>): PromptChoice[] {
+  return Object.entries(presets)
+    .sort(([left], [right]) => left.localeCompare(right))
+    .map(([name, skills]) => ({
+      value: name,
+      label: name,
+      description: formatPresetChoiceDescription(skills),
+    }));
 }
 
 async function withLoadedConfig<T>(callback: (skillsDir: string) => Promise<T>): Promise<T> {
@@ -128,7 +159,7 @@ function createProgram(deps: CliDependencies = {}): Command {
       const collected = await collectSingle(
         { canPrompt: canPrompt(), prompt },
         name,
-        availableSkills.map((skill) => skill.name),
+        createSkillChoices(availableSkills),
         'Select a skill to inspect',
         'Skill name is required in non-interactive mode.',
         'Run `skm skill inspect <name>`.',
@@ -150,7 +181,7 @@ function createProgram(deps: CliDependencies = {}): Command {
       const selectedSkills = await collectMany(
         { canPrompt: canPrompt(), prompt },
         names,
-        availableSkills.map((skill) => skill.name),
+        createSkillChoices(availableSkills),
         'Select skills to enable',
         'At least one skill name is required in non-interactive mode.',
         'Run `skm skill enable <name...> --target <target>`.',
@@ -187,7 +218,7 @@ function createProgram(deps: CliDependencies = {}): Command {
       const selected = await collectMany(
         { canPrompt: canPrompt(), prompt },
         names,
-        enabledSkills,
+        createNamedChoices(enabledSkills),
         'Select skills to disable',
         'At least one skill name is required in non-interactive mode.',
         'Run `skm skill disable <name...>`.',
@@ -240,7 +271,7 @@ function createProgram(deps: CliDependencies = {}): Command {
       const collected = await collectSingle(
         { canPrompt: canPrompt(), prompt },
         name,
-        Object.keys(presets).sort((left, right) => left.localeCompare(right)),
+        createPresetChoices(presets),
         'Select a preset to inspect',
         'Preset name is required in non-interactive mode.',
         'Run `skm preset inspect <name>`.',
@@ -258,7 +289,7 @@ function createProgram(deps: CliDependencies = {}): Command {
       const selectedPresets = await collectMany(
         { canPrompt: canPrompt(), prompt },
         names,
-        Object.keys(presets).sort((left, right) => left.localeCompare(right)),
+        createPresetChoices(presets),
         'Select presets to enable',
         'At least one preset name is required in non-interactive mode.',
         'Run `skm preset enable <name...> --target <target>`.',
@@ -300,7 +331,7 @@ function createProgram(deps: CliDependencies = {}): Command {
       const selected = await collectMany(
         { canPrompt: canPrompt(), prompt },
         names,
-        enabledPresets,
+        createNamedChoices(enabledPresets),
         'Select presets to disable',
         'At least one preset name is required in non-interactive mode.',
         'Run `skm preset disable <name...>`.',
@@ -360,7 +391,7 @@ function createProgram(deps: CliDependencies = {}): Command {
       const selectedSkills = await collectMany(
         promptContext,
         skills,
-        availableSkills.map((skill) => skill.name),
+        createSkillChoices(availableSkills),
         'Select skills for the preset',
         'At least one skill is required in non-interactive mode.',
         'Run `skm preset add <name> <skill...>`.',
@@ -400,7 +431,7 @@ function createProgram(deps: CliDependencies = {}): Command {
       const collectedName = await collectSingle(
         promptContext,
         name,
-        Object.keys(presets).sort((left, right) => left.localeCompare(right)),
+        createPresetChoices(presets),
         'Select a preset to update',
         'Preset name is required in non-interactive mode.',
         'Run `skm preset update <name> <skill...>`.',
@@ -410,7 +441,7 @@ function createProgram(deps: CliDependencies = {}): Command {
       const selectedSkills = await collectMany(
         promptContext,
         skills,
-        availableSkills.map((skill) => skill.name),
+        createSkillChoices(availableSkills),
         'Select replacement skills for the preset',
         'At least one skill is required in non-interactive mode.',
         'Run `skm preset update <name> <skill...>`.',
@@ -443,7 +474,7 @@ function createProgram(deps: CliDependencies = {}): Command {
       const collected = await collectSingle(
         promptContext,
         name,
-        Object.keys(presets).sort((left, right) => left.localeCompare(right)),
+        createPresetChoices(presets),
         'Select a preset to delete',
         'Preset name is required in non-interactive mode.',
         'Run `skm preset delete <name>`.',
