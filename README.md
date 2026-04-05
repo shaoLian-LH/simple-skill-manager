@@ -1,9 +1,9 @@
 # simple-skill-manager
 
-`simple-skill-manager` (`skm`) is a Node.js CLI for managing skill visibility in a local machine and linking selected skills into project targets such as `.agents` and `.trae`.
+`simple-skill-manager` (`skm`) is a Node.js CLI for managing local skill visibility and linking selected skills into project targets such as `.agents` and `.trae`.
 
-It does not execute skills. It only manages:
-- the global skill registry location
+It does not execute skills. It manages:
+- the global skills directory
 - preset definitions
 - project-local `.skm/state.json`
 - target installation via symlink with copy fallback
@@ -22,50 +22,77 @@ node dist/skm.js --help
 
 The packaged CLI entry is exposed through `package.json#bin` as `skm`.
 
-## Examples
+## Initial setup
 
-### 1. Initialize `skm` and set or update the global skills directory
-
-First initialize the global config directory under `~/.simple-skill-manager/`:
+Initialize the global app directory under `~/.simple-skill-manager/`:
 
 ```bash
 skm config init
 ```
 
-Then point `skm` at the directory that contains your global skills repository:
+Point `skm` at the directory that contains your skill folders:
 
 ```bash
 skm config set skills-dir ~/my-skills
 ```
 
-If you later move to a different skills repository, run the same command again with the new path:
-
-```bash
-skm config set skills-dir /path/to/another-skill-repo
-```
-
-Inspect the effective config:
+Check the effective config:
 
 ```bash
 skm config get
 ```
 
-Inspect the skills discovered from the configured repository:
+`config init` creates:
+- `~/.simple-skill-manager/config.json`
+- `~/.simple-skill-manager/presets.yaml`
+- `~/.simple-skill-manager/projects.json`
+- `~/.simple-skill-manager/skills/` as the default local skills directory
 
-```bash
-skm skill list
-skm skill inspect brainstorming
-```
+Once setup is done, everything below is a command quick reference.
 
-### 2. Configure presets and understand how a preset decides its skills
+## Command quick reference
 
-Presets are global definitions stored in `~/.simple-skill-manager/presets.yaml`.
+### `config`
 
-Each preset is a simple mapping:
-- key = preset name
-- value = list of skill names
+| Command | Purpose | Example / note |
+| --- | --- | --- |
+| `skm config init` | Create the global app directory and default files. | Run this first on a new machine. |
+| `skm config get` | Print the current global config as JSON. | `skm config get` |
+| `skm config set skills-dir <path>` | Update `skillsDir` to an existing directory. | `skm config set skills-dir ~/my-skills` |
 
-Example:
+### `skill`
+
+| Command | Purpose | Example / note |
+| --- | --- | --- |
+| `skm skill list` | List all discovered skills from the configured `skillsDir`. | `skm skill list` |
+| `skm skill inspect [name]` | Show the source path, frontmatter, and body preview for one skill. | `skm skill inspect brainstorming` |
+| `skm skill enable [names...] --target <target>` | Enable one or more skills in the current project and install them into one or more targets. | `skm skill enable brainstorming --target .agents` |
+| `skm skill disable [names...]` | Disable explicitly enabled skills in the current project. | `skm skill disable brainstorming` |
+
+Quick notes:
+- Repeat `--target` to install into multiple targets: `--target .agents --target .trae`
+- If the project already has recorded targets, interactive flows reuse them as defaults; otherwise the global default target is `.agents`
+- In a TTY session, commands with optional names can prompt you to select entries interactively
+
+### `preset`
+
+| Command | Purpose | Example / note |
+| --- | --- | --- |
+| `skm preset list` | List all configured presets. | `skm preset list` |
+| `skm preset inspect [name]` | Show the skill list expanded from one preset. | `skm preset inspect frontend-basic` |
+| `skm preset enable [names...] --target <target>` | Enable one or more presets in the current project. | `skm preset enable frontend-basic --target .agents` |
+| `skm preset disable [names...]` | Disable one or more presets in the current project. | `skm preset disable frontend-basic` |
+| `skm preset add [name] [skills...]` | Create a preset with a non-empty skill list. | `skm preset add frontend-basic brainstorming test-engineer` |
+| `skm preset update [name] [skills...]` | Replace the full skill list for an existing preset. | `skm preset update frontend-basic brainstorming` |
+| `skm preset delete [name]` | Delete a preset from global `presets.yaml`. | `skm preset delete frontend-basic` |
+
+Quick notes:
+- Presets live in `~/.simple-skill-manager/presets.yaml`
+- Each preset is `preset-name -> [skill-name, ...]`
+- `skm preset enable ...` expands preset names into the skill names stored in `presets.yaml`
+- `skm preset delete ...` warns when the preset is still referenced by project state
+
+Example `presets.yaml`:
 
 ```yaml
 frontend-basic:
@@ -77,107 +104,53 @@ researcher:
   - url-to-markdown
 ```
 
-In this model:
-- enabling `frontend-basic` means enabling `brainstorming` and `test-engineer`
-- enabling `researcher` means enabling `deep-research` and `url-to-markdown`
-- presets do not contain paths or targets; they only decide which skill names should be expanded
+### `sync` and `doctor`
 
-Manage presets with CLI:
+| Command | Purpose | Example / note |
+| --- | --- | --- |
+| `skm sync` | Reconcile installed target entries so they match `.skm/state.json`. | Run after fixing missing files or target drift. |
+| `skm doctor` | Inspect project drift, missing sources, stale index entries, broken links, and missing preset definitions. | `skm doctor` |
 
-```bash
-skm preset add frontend-basic brainstorming test-engineer
-skm preset update frontend-basic brainstorming
-skm preset delete frontend-basic
-```
+## State and files
 
-Or inspect what `skm` sees from `presets.yaml`:
+| Path | Purpose |
+| --- | --- |
+| `~/.simple-skill-manager/config.json` | Global config, including `skillsDir` and `defaultTargets` |
+| `~/.simple-skill-manager/presets.yaml` | Global preset definitions |
+| `~/.simple-skill-manager/projects.json` | Mirror index of known project state |
+| `.skm/state.json` | Authoritative project-local state |
 
-```bash
-skm preset list
-skm preset inspect frontend-basic
-skm preset inspect researcher
-```
+Related behavior:
+- `skm skill enable ...` and `skm preset enable ...` create or update `.skm/state.json`
+- Those commands also ensure `.gitignore` contains `.skm`
+- Successful command output is JSON unless the CLI is returning a plain message or error
 
-### 3. Enable or disable presets/skills inside a project
+## Install behavior
 
-Inside a project directory, enable a single skill:
-
-```bash
-skm skill enable brainstorming --target .agents
-```
-
-Enable a single skill into multiple targets:
-
-```bash
-skm skill enable brainstorming --target .agents --target .trae
-```
-
-Enable a preset, which expands to the skills listed in `presets.yaml`:
-
-```bash
-skm preset enable frontend-basic --target .agents
-```
-
-Disable a single explicitly enabled skill:
-
-```bash
-skm skill disable brainstorming
-```
-
-Disable a preset:
-
-```bash
-skm preset disable frontend-basic
-```
-
-Check and repair project drift:
-
-```bash
-skm doctor
-skm sync
-```
-
-When `skill enable` or `preset enable` runs, `skm` will:
-- create or update `.skm/state.json`
-- append `.skm` to `.gitignore` if needed
-- install skills into `.agents/skills/<name>` or `.trae/skills/<name>`
-- update the global mirror index in `~/.simple-skill-manager/projects.json`
-
-## State files
-
-Global files live under `~/.simple-skill-manager/`:
-- `config.json`: global settings including `skillsDir`
-- `presets.yaml`: preset name to skill-name array mapping
-- `projects.json`: mirror index of project state
-
-Project-local state lives under `.skm/`:
-- `.skm/state.json`: authoritative project state
-
-When `skm skill enable ...` or `skm preset enable ...` runs, it also ensures `.gitignore` contains `.skm`.
-
-## Installation behavior
-
-For each enabled target, skills are installed to:
+Skills are installed per target at:
 
 ```text
 <project>/<target>/skills/<skill-name>
 ```
 
-Install mode behavior:
-- prefer symlink
-- fall back to copy when symlink creation fails
-- record the resulting `installMode` in `.skm/state.json`
-- preserve the recorded mode on later syncs
+Install rules:
+- supported targets are `.agents` and `.trae`
+- `skm` prefers symlinks
+- it falls back to copying when symlink creation fails
+- the chosen `installMode` is recorded in `.skm/state.json`
+- later syncs preserve the recorded install mode
 
 ## Common failures
 
-- Missing global config: run `skm config init`
-- Missing or invalid `skillsDir`: run `skm config set skills-dir <path>` with an existing directory
-- Duplicate skill names: fix conflicting `name` fields in `SKILL.md` frontmatter
-- Invalid presets YAML: repair `~/.simple-skill-manager/presets.yaml`
-- Target conflict: remove the unknown file or directory that already occupies `<target>/skills/<skill-name>`
+| Problem | Fix |
+| --- | --- |
+| Global config is missing | Run `skm config init` |
+| `skillsDir` is missing or invalid | Run `skm config set skills-dir <path>` with an existing directory |
+| Duplicate skill names exist | Fix conflicting `name` fields in `SKILL.md` frontmatter |
+| `presets.yaml` is invalid | Repair `~/.simple-skill-manager/presets.yaml` so each preset maps to a string array |
+| A target path is already occupied by an unrelated file or directory | Remove the conflicting entry at `<target>/skills/<skill-name>` and run `skm sync` again |
 
-## Development checks
+## Development
 
 ```bash
 npm run check
