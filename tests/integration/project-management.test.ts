@@ -1,0 +1,178 @@
+import fs from 'node:fs/promises';
+import path from 'node:path';
+
+import { describe, expect, it } from 'vitest';
+
+import { createSkillFixtures, writePresetsFile } from '../helpers/fixtures.js';
+import { initConfigWithSkills, readProjectState, readProjectsIndex } from '../helpers/skm-env.js';
+import { withTempDir } from '../helpers/temp.js';
+import { runCli, runCliExpectFailure } from '../helpers/cli.js';
+
+function globalAppDir(homeDir: string): string {
+  return path.join(homeDir, '.simple-skill-manager');
+}
+
+describe('project activation and maintenance', () => {
+  it('enables a skill, mirrors project index, and stays idempotent on rerun', async () => {
+    await withTempDir('skm-home-', async (homeDir) => {
+      await withTempDir('skm-project-', async (projectDir) => {
+        const resolvedProjectDir = await fs.realpath(projectDir);
+        const skillsDir = path.join(homeDir, 'skills-registry');
+        await createSkillFixtures(skillsDir, [
+          { dirName: 'brainstorming', name: 'brainstorming', description: 'Generate candidate ideas' },
+        ]);
+        await initConfigWithSkills(homeDir, skillsDir);
+
+        await runCli(['enable', 'skill', 'brainstorming', '--target', '.agents'], {
+          cwd: projectDir,
+          env: { HOME: homeDir },
+        });
+        await runCli(['enable', 'skill', 'brainstorming', '--target', '.agents'], {
+          cwd: projectDir,
+          env: { HOME: homeDir },
+        });
+
+        const state = (await readProjectState(projectDir)) as {
+          enabledSkills: string[];
+          enabledPresets: string[];
+          targets: Record<string, { skills: Record<string, { sourcePath: string; installMode: string }> }>;
+        };
+        const index = (await readProjectsIndex(homeDir)) as {
+          projects: Record<string, { targets: string[]; enabledSkills: string[] }>;
+        };
+        const installPath = path.join(projectDir, '.agents', 'skills', 'brainstorming');
+        const installStats = await fs.lstat(installPath);
+        const gitignore = await fs.readFile(path.join(projectDir, '.gitignore'), 'utf8');
+
+        expect(state.enabledSkills).toEqual(['brainstorming']);
+        expect(state.enabledPresets).toEqual([]);
+        const agentTarget = state.targets['.agents'];
+        expect(agentTarget).toBeDefined();
+        const brainstormingInstall = agentTarget!.skills.brainstorming;
+        expect(brainstormingInstall).toBeDefined();
+        expect(brainstormingInstall!.sourcePath).toBe(path.join(skillsDir, 'brainstorming'));
+        expect(index.projects[resolvedProjectDir]).toMatchObject({
+          targets: ['.agents'],
+          enabledSkills: ['brainstorming'],
+        });
+        expect(installStats.isSymbolicLink() || installStats.isDirectory()).toBe(true);
+        expect(gitignore.trim().split(/\r?\n/)).toContain('.skm');
+      });
+    });
+  });
+
+  it('fails when the target path is already occupied by an unknown entry', async () => {
+    await withTempDir('skm-home-', async (homeDir) => {
+      await withTempDir('skm-project-', async (projectDir) => {
+        const resolvedProjectDir = await fs.realpath(projectDir);
+        const skillsDir = path.join(homeDir, 'skills-registry');
+        await createSkillFixtures(skillsDir, [{ dirName: 'brainstorming', name: 'brainstorming' }]);
+        await initConfigWithSkills(homeDir, skillsDir);
+
+        const occupiedPath = path.join(projectDir, '.agents', 'skills', 'brainstorming');
+        await fs.mkdir(occupiedPath, { recursive: true });
+        await fs.writeFile(path.join(occupiedPath, 'README.txt'), 'occupied', 'utf8');
+
+        const failure = await runCliExpectFailure(['enable', 'skill', 'brainstorming', '--target', '.agents'], {
+          cwd: projectDir,
+          env: { HOME: homeDir },
+        });
+
+        expect(failure.stderr).toContain('Target path is already occupied');
+        expect(failure.code).toBe(4);
+      });
+    });
+  });
+
+  it('enables presets, preserves preset-referenced skills on disable, and removes stale installs when disabling a preset', async () => {
+    await withTempDir('skm-home-', async (homeDir) => {
+      await withTempDir('skm-project-', async (projectDir) => {
+        const skillsDir = path.join(homeDir, 'skills-registry');
+        await createSkillFixtures(skillsDir, [
+          { dirName: 'brainstorming', name: 'brainstorming' },
+          { dirName: 'test-engineer', name: 'test-engineer' },
+        ]);
+        await initConfigWithSkills(homeDir, skillsDir);
+        await writePresetsFile(
+          path.join(globalAppDir(homeDir), 'presets.yaml'),
+          ['frontend-basic:', '  - brainstorming', '  - test-engineer'].join('\n'),
+        );
+
+        await runCli(['enable', 'skill', 'brainstorming', '--target', '.agents'], { cwd: projectDir, env: { HOME: homeDir } });
+        await runCli(['enable', 'preset', 'frontend-basic', '--target', '.agents'], { cwd: projectDir, env: { HOME: homeDir } });
+        await runCli(['disable', 'skill', 'brainstorming'], { cwd: projectDir, env: { HOME: homeDir } });
+
+        let state = (await readProjectState(projectDir)) as {
+          enabledSkills: string[];
+          enabledPresets: string[];
+          targets: Record<string, { skills: Record<string, unknown> }>;
+        };
+        expect(state.enabledSkills).toEqual([]);
+        expect(state.enabledPresets).toEqual(['frontend-basic']);
+        const agentTarget = state.targets['.agents'];
+        expect(agentTarget).toBeDefined();
+        expect(Object.keys(agentTarget!.skills).sort()).toEqual(['brainstorming', 'test-engineer']);
+
+        await runCli(['disable', 'preset', 'frontend-basic'], { cwd: projectDir, env: { HOME: homeDir } });
+        state = (await readProjectState(projectDir)) as {
+          enabledSkills: string[];
+          enabledPresets: string[];
+          targets: Record<string, { skills: Record<string, unknown> }>;
+        };
+
+        expect(state.enabledSkills).toEqual([]);
+        expect(state.enabledPresets).toEqual([]);
+        expect(state.targets).toEqual({});
+        await expect(fs.access(path.join(projectDir, '.agents', 'skills', 'brainstorming'))).rejects.toThrow();
+        await expect(fs.access(path.join(projectDir, '.agents', 'skills', 'test-engineer'))).rejects.toThrow();
+      });
+    });
+  });
+
+  it('doctor reports missing installs and stale global index, and sync repairs them', async () => {
+    await withTempDir('skm-home-', async (homeDir) => {
+      await withTempDir('skm-project-', async (projectDir) => {
+        const resolvedProjectDir = await fs.realpath(projectDir);
+        const skillsDir = path.join(homeDir, 'skills-registry');
+        await createSkillFixtures(skillsDir, [
+          { dirName: 'brainstorming', name: 'brainstorming' },
+          { dirName: 'test-engineer', name: 'test-engineer' },
+        ]);
+        await initConfigWithSkills(homeDir, skillsDir);
+        await writePresetsFile(
+          path.join(globalAppDir(homeDir), 'presets.yaml'),
+          ['frontend-basic:', '  - brainstorming', '  - test-engineer'].join('\n'),
+        );
+
+        await runCli(['enable', 'preset', 'frontend-basic', '--target', '.agents'], { cwd: projectDir, env: { HOME: homeDir } });
+        await fs.rm(path.join(projectDir, '.agents', 'skills', 'test-engineer'), { recursive: true, force: true });
+
+        const projectsFile = path.join(globalAppDir(homeDir), 'projects.json');
+        const staleIndex = JSON.parse(await fs.readFile(projectsFile, 'utf8')) as { projects: Record<string, unknown> };
+        staleIndex.projects[resolvedProjectDir] = {
+          targets: ['.trae'],
+          enabledSkills: [],
+          enabledPresets: [],
+          updatedAt: '2000-01-01T00:00:00.000Z',
+        };
+        await fs.writeFile(projectsFile, `${JSON.stringify(staleIndex, null, 2)}\n`, 'utf8');
+
+        const doctor = await runCli(['doctor'], { cwd: projectDir, env: { HOME: homeDir } });
+        const doctorJson = JSON.parse(doctor.stdout) as { ok: boolean; issues: Array<{ type: string }> };
+        expect(doctorJson.ok).toBe(false);
+        expect(doctorJson.issues.map((issue) => issue.type)).toEqual(
+          expect.arrayContaining(['missing-installation', 'stale-global-index']),
+        );
+
+        await runCli(['sync'], { cwd: projectDir, env: { HOME: homeDir } });
+        const healedDoctor = JSON.parse((await runCli(['doctor'], { cwd: projectDir, env: { HOME: homeDir } })).stdout) as {
+          ok: boolean;
+          issues: Array<{ type: string }>;
+        };
+
+        expect(healedDoctor.ok).toBe(true);
+        await expect(fs.access(path.join(projectDir, '.agents', 'skills', 'test-engineer'))).resolves.toBeUndefined();
+      });
+    });
+  });
+});
