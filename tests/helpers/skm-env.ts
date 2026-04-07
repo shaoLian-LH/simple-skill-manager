@@ -25,3 +25,8 @@ export async function readProjectsIndex(homeDir: string): Promise<unknown> {
   const filePath = path.join(homeDir, '.simple-skill-manager', 'projects.json');
   return JSON.parse(await fs.readFile(filePath, 'utf8')) as unknown;
 }
+
+export async function readGlobalState(homeDir: string): Promise<unknown> {
+  const filePath = path.join(homeDir, '.simple-skill-manager', 'global-state.json');
+  return JSON.parse(await fs.readFile(filePath, 'utf8')) as unknown;
+}

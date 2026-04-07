@@ -1,7 +1,53 @@
-export const SUPPORTED_TARGETS = ['.agents', '.trae'] as const;
-export type TargetName = (typeof SUPPORTED_TARGETS)[number];
+export const TARGET_REGISTRY = {
+  '.agents': {
+    name: '.agents',
+    projectRootDir: '.agents',
+    globalRootDir: '.agents',
+    installKind: 'skill-dir',
+    localInstallBase: 'skills',
+    globalInstallBase: 'skills',
+  },
+  '.trae': {
+    name: '.trae',
+    projectRootDir: '.trae',
+    globalRootDir: '.trae',
+    installKind: 'skill-dir',
+    localInstallBase: 'skills',
+    globalInstallBase: 'skills',
+  },
+  '.kiro': {
+    name: '.kiro',
+    projectRootDir: '.kiro',
+    globalRootDir: '.kiro',
+    installKind: 'skill-dir',
+    localInstallBase: 'skills',
+    globalInstallBase: 'skills',
+  },
+  '.claude': {
+    name: '.claude',
+    projectRootDir: '.claude',
+    globalRootDir: '.claude',
+    installKind: 'skill-dir',
+    localInstallBase: 'skills',
+    globalInstallBase: 'skills',
+  },
+  '.gemini': {
+    name: '.gemini',
+    projectRootDir: '.gemini',
+    globalRootDir: '.gemini',
+    installKind: 'gemini-command',
+    localInstallBase: 'commands',
+    globalInstallBase: 'commands',
+  },
+} as const;
 
-export const INSTALL_MODES = ['symlink', 'copy'] as const;
+export type TargetName = keyof typeof TARGET_REGISTRY;
+export type TargetInstallKind = (typeof TARGET_REGISTRY)[TargetName]['installKind'];
+export type ActivationScope = 'project' | 'global';
+export type TargetSpec = (typeof TARGET_REGISTRY)[TargetName];
+export const SUPPORTED_TARGETS = Object.keys(TARGET_REGISTRY) as TargetName[];
+
+export const INSTALL_MODES = ['symlink', 'copy', 'generated'] as const;
 export type InstallMode = (typeof INSTALL_MODES)[number];
 export const PRESET_SOURCES = ['static', 'dynamic'] as const;
 export type PresetSource = (typeof PRESET_SOURCES)[number];
@@ -44,14 +90,21 @@ export interface TargetState {
   skills: Record<string, InstalledSkillRecord>;
 }
 
-export interface ProjectState {
+export interface ActivationState {
   version: 1;
-  projectPath: string;
   targets: Partial<Record<TargetName, TargetState>>;
   enabledSkills: string[];
   enabledPresets: string[];
   updatedAt: string;
 }
+
+export interface ProjectState extends ActivationState {
+  projectPath: string;
+}
+
+export interface GlobalState extends ActivationState {}
+
+export type ScopedState = ProjectState | GlobalState;
 
 export interface ProjectIndexEntry {
   targets: TargetName[];

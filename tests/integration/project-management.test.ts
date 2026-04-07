@@ -4,7 +4,7 @@ import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 import { createSkillFixtures, writePresetsFile } from '../helpers/fixtures.js';
-import { initConfigWithSkills, readProjectState, readProjectsIndex } from '../helpers/skm-env.js';
+import { initConfigWithSkills, readGlobalState, readProjectState, readProjectsIndex } from '../helpers/skm-env.js';
 import { withTempDir } from '../helpers/temp.js';
 import { runCli, runCliExpectFailure } from '../helpers/cli.js';
 
@@ -285,6 +285,117 @@ describe('project activation and maintenance', () => {
         expect(healedDoctor.issues).toEqual([]);
         await expect(fs.access(path.join(projectDir, '.agents', 'skills', 'impeccable', 'polish'))).resolves.toBeUndefined();
       });
+    });
+  });
+
+  it('enables and disables skills in global scope without touching projects index', async () => {
+    await withTempDir('skm-home-', async (homeDir) => {
+      const skillsDir = path.join(homeDir, 'skills-registry');
+      await createSkillFixtures(skillsDir, [{ dirName: 'brainstorming', name: 'brainstorming' }]);
+      await initConfigWithSkills(homeDir, skillsDir);
+
+      await runCli(['skill', 'enable', 'brainstorming', '--global', '--target', '.agents'], {
+        env: { HOME: homeDir },
+      });
+
+      let globalState = (await readGlobalState(homeDir)) as {
+        enabledSkills: string[];
+        enabledPresets: string[];
+        targets: Record<string, { skills: Record<string, { installMode: string; sourcePath: string }> }>;
+      };
+      const installPath = path.join(homeDir, '.agents', 'skills', 'brainstorming');
+      const installStats = await fs.lstat(installPath);
+      const projectsIndex = (await readProjectsIndex(homeDir)) as { projects: Record<string, unknown> };
+
+      expect(globalState.enabledSkills).toEqual(['brainstorming']);
+      expect(globalState.enabledPresets).toEqual([]);
+      expect(globalState.targets['.agents']?.skills.brainstorming).toMatchObject({
+        installMode: expect.stringMatching(/^(symlink|copy)$/),
+        sourcePath: path.join(skillsDir, 'brainstorming'),
+      });
+      expect(Object.keys(projectsIndex.projects)).toEqual([]);
+      expect(installStats.isSymbolicLink() || installStats.isDirectory()).toBe(true);
+
+      await runCli(['skill', 'disable', 'brainstorming', '--global'], {
+        env: { HOME: homeDir },
+      });
+
+      globalState = (await readGlobalState(homeDir)) as {
+        enabledSkills: string[];
+        enabledPresets: string[];
+        targets: Record<string, unknown>;
+      };
+      expect(globalState.enabledSkills).toEqual([]);
+      expect(globalState.enabledPresets).toEqual([]);
+      expect(globalState.targets).toEqual({});
+      await expect(fs.access(installPath)).rejects.toThrow();
+    });
+  });
+
+  it('projects scoped skills into gemini commands for project and global scope', async () => {
+    await withTempDir('skm-home-', async (homeDir) => {
+      await withTempDir('skm-project-', async (projectDir) => {
+        const skillsDir = path.join(homeDir, 'skills-registry');
+        await createSkillFixtures(skillsDir, [
+          {
+            dirName: 'impeccable/polish',
+            name: 'polish',
+            description: 'Refine surface details.',
+            body: ['# Polish Mode', 'Use the exact brand voice.'].join('\n'),
+          },
+        ]);
+        await initConfigWithSkills(homeDir, skillsDir);
+
+        await runCli(['skill', 'enable', 'impeccable/polish', '--target', '.gemini'], {
+          cwd: projectDir,
+          env: { HOME: homeDir },
+        });
+        await runCli(['skill', 'enable', 'impeccable/polish', '--global', '--target', '.gemini'], {
+          env: { HOME: homeDir },
+        });
+
+        const projectState = (await readProjectState(projectDir)) as {
+          targets: Record<string, { skills: Record<string, { installMode: string }> }>;
+        };
+        const globalState = (await readGlobalState(homeDir)) as {
+          targets: Record<string, { skills: Record<string, { installMode: string }> }>;
+        };
+        const expectedToml = `description = ${JSON.stringify('Refine surface details.')}\nprompt = ${JSON.stringify('# Polish Mode\nUse the exact brand voice.')}\n`;
+        const projectTomlPath = path.join(projectDir, '.gemini', 'commands', 'impeccable', 'polish.toml');
+        const globalTomlPath = path.join(homeDir, '.gemini', 'commands', 'impeccable', 'polish.toml');
+
+        expect(projectState.targets['.gemini']?.skills['impeccable/polish']?.installMode).toBe('generated');
+        expect(globalState.targets['.gemini']?.skills['impeccable/polish']?.installMode).toBe('generated');
+        expect(await fs.readFile(projectTomlPath, 'utf8')).toBe(expectedToml);
+        expect(await fs.readFile(globalTomlPath, 'utf8')).toBe(expectedToml);
+      });
+    });
+  });
+
+  it('reports and repairs missing global installations via doctor and sync', async () => {
+    await withTempDir('skm-home-', async (homeDir) => {
+      const skillsDir = path.join(homeDir, 'skills-registry');
+      await createSkillFixtures(skillsDir, [{ dirName: 'brainstorming', name: 'brainstorming' }]);
+      await initConfigWithSkills(homeDir, skillsDir);
+
+      await runCli(['skill', 'enable', 'brainstorming', '--global', '--target', '.agents'], {
+        env: { HOME: homeDir },
+      });
+      await fs.rm(path.join(homeDir, '.agents', 'skills', 'brainstorming'), { recursive: true, force: true });
+
+      const doctor = await runCli(['doctor', '--global'], { env: { HOME: homeDir } });
+      const doctorJson = JSON.parse(doctor.stdout) as { ok: boolean; issues: Array<{ type: string }> };
+      expect(doctorJson.ok).toBe(false);
+      expect(doctorJson.issues.map((issue) => issue.type)).toEqual(expect.arrayContaining(['missing-installation']));
+
+      await runCli(['sync', '--global'], { env: { HOME: homeDir } });
+      const healedDoctor = JSON.parse((await runCli(['doctor', '--global'], { env: { HOME: homeDir } })).stdout) as {
+        ok: boolean;
+        issues: Array<{ type: string }>;
+      };
+
+      expect(healedDoctor.ok).toBe(true);
+      await expect(fs.access(path.join(homeDir, '.agents', 'skills', 'brainstorming'))).resolves.toBeUndefined();
     });
   });
 });

@@ -3,9 +3,11 @@ import { Command, CommanderError } from 'commander';
 import {
   disablePresets,
   disableSkills,
+  doctorGlobal,
   doctorProject,
   enablePresets,
   enableSkills,
+  syncGlobal,
   syncProject,
 } from '../core/activation/service.js';
 import { loadConfig, initGlobalConfig, setSkillsDir } from '../core/config/service.js';
@@ -21,8 +23,9 @@ import {
   updatePresetDefinition,
 } from '../core/registry/presets.js';
 import { getSkillByName, listSkills, toSkillInspectView } from '../core/registry/skills.js';
+import { loadGlobalState } from '../core/state/global-state.js';
 import { loadProjectState } from '../core/state/project-state.js';
-import type { PresetDefinition } from '../core/types.js';
+import type { ActivationScope, ActivationState, PresetDefinition } from '../core/types.js';
 import { toDisplayPath } from '../core/utils/path.js';
 import { runUiCommand, type UiCommandRuntime } from '../ui/server/runtime.js';
 import { PromptCancelledError, type PromptAdapter, type PromptChoice, TtyPromptAdapter } from './interactive/adapter.js';
@@ -98,6 +101,23 @@ function createPresetChoices(presets: PresetDefinition[]): PromptChoice[] {
 async function withLoadedConfig<T>(callback: (skillsDir: string) => Promise<T>): Promise<T> {
   const { config } = await loadConfig();
   return callback(config.skillsDir);
+}
+
+function scopeLabel(scope: ActivationScope): string {
+  return scope === 'global' ? 'globally' : 'in the current project';
+}
+
+function scopeNoun(scope: ActivationScope): string {
+  return scope === 'global' ? 'global' : 'project';
+}
+
+async function loadScopeState(scope: ActivationScope, cwd: string): Promise<ActivationState | null> {
+  if (scope === 'global') {
+    const { paths } = await loadConfig();
+    return loadGlobalState(paths);
+  }
+
+  return loadProjectState(cwd);
 }
 
 export interface CliDependencies {
@@ -193,9 +213,11 @@ function createProgram(deps: CliDependencies = {}): Command {
 
   skillCommand
     .command('enable [names...]')
-    .description('Enable one or more skills in the current project and install them into selected targets.')
+    .description('Enable one or more skills in the selected scope and install them into selected targets.')
     .option('-t, --target <target>', 'Target root to install into. Repeat to install into multiple targets.', collectTargetsOption, [])
-    .action(async (names: string[] | undefined, options: { target: string[] }) => {
+    .option('--global', 'Enable in global scope instead of the current project.')
+    .action(async (names: string[] | undefined, options: { target: string[]; global?: boolean }) => {
+      const scope: ActivationScope = options.global ? 'global' : 'project';
       const availableSkills = await withLoadedConfig((skillsDir) => listSkills(skillsDir));
       if ((!names || names.length === 0) && availableSkills.length === 0) {
         printStdout(renderMessage('No skills are available to enable.'));
@@ -211,13 +233,18 @@ function createProgram(deps: CliDependencies = {}): Command {
       );
 
       const { config } = await loadConfig();
-      const previousState = await loadProjectState(process.cwd());
-      const defaultTargets = previousState && Object.keys(previousState.targets).length > 0 ? Object.keys(previousState.targets) : config.defaultTargets;
-      const selectedTargets = await collectTargets({ canPrompt: canPrompt(), prompt }, options.target, defaultTargets);
+      const previousState = await loadScopeState(scope, process.cwd());
+      const defaultTargets =
+        previousState && Object.keys(previousState.targets).length > 0
+          ? Object.keys(previousState.targets)
+          : scope === 'project'
+            ? config.defaultTargets
+            : [];
+      const selectedTargets = await collectTargets({ canPrompt: canPrompt(), prompt }, options.target, defaultTargets, scope);
 
       if (selectedSkills.usedPrompt || selectedTargets.usedPrompt) {
         const confirmed = await prompt.confirm(
-          `Enable skills [${selectedSkills.values.join(', ')}] with targets [${(selectedTargets.targets.length > 0 ? selectedTargets.targets : defaultTargets).join(', ')}]?`,
+          `Enable skills [${selectedSkills.values.join(', ')}] ${scopeLabel(scope)} with targets [${(selectedTargets.targets.length > 0 ? selectedTargets.targets : defaultTargets).join(', ')}]?`,
         );
         if (!confirmed) {
           throw new PromptCancelledError();
@@ -225,7 +252,8 @@ function createProgram(deps: CliDependencies = {}): Command {
       }
 
       const state = await enableSkills({
-        projectPath: process.cwd(),
+        scope,
+        projectPath: scope === 'project' ? process.cwd() : undefined,
         skillNames: selectedSkills.values,
         targets: selectedTargets.targets,
       });
@@ -234,9 +262,11 @@ function createProgram(deps: CliDependencies = {}): Command {
 
   skillCommand
     .command('disable [names...]')
-    .description('Disable one or more explicitly enabled skills in the current project.')
-    .action(async (names: string[] | undefined) => {
-      const previousState = await loadProjectState(process.cwd());
+    .description('Disable one or more explicitly enabled skills in the selected scope.')
+    .option('--global', 'Disable from global scope instead of the current project.')
+    .action(async (names: string[] | undefined, options: { global?: boolean }) => {
+      const scope: ActivationScope = options.global ? 'global' : 'project';
+      const previousState = await loadScopeState(scope, process.cwd());
       const enabledSkills = previousState?.enabledSkills ?? [];
       const selected = await collectMany(
         { canPrompt: canPrompt(), prompt },
@@ -253,14 +283,15 @@ function createProgram(deps: CliDependencies = {}): Command {
       }
 
       if (selected.usedPrompt) {
-        const confirmed = await prompt.confirm(`Disable skills [${selected.values.join(', ')}]?`);
+        const confirmed = await prompt.confirm(`Disable skills [${selected.values.join(', ')}] from the ${scopeNoun(scope)} scope?`);
         if (!confirmed) {
           throw new PromptCancelledError();
         }
       }
 
       const state = await disableSkills({
-        projectPath: process.cwd(),
+        scope,
+        projectPath: scope === 'project' ? process.cwd() : undefined,
         skillNames: selected.values,
       });
       printStdout(renderJson(state));
@@ -309,9 +340,11 @@ function createProgram(deps: CliDependencies = {}): Command {
 
   presetCommand
     .command('enable [names...]')
-    .description('Enable one or more presets in the current project and install their skills into selected targets.')
+    .description('Enable one or more presets in the selected scope and install their skills into selected targets.')
     .option('-t, --target <target>', 'Target root to install into. Repeat to install into multiple targets.', collectTargetsOption, [])
-    .action(async (names: string[] | undefined, options: { target: string[] }) => {
+    .option('--global', 'Enable in global scope instead of the current project.')
+    .action(async (names: string[] | undefined, options: { target: string[]; global?: boolean }) => {
+      const scope: ActivationScope = options.global ? 'global' : 'project';
       const presets = await listPresetDefinitions();
       const selectedPresets = await collectMany(
         { canPrompt: canPrompt(), prompt },
@@ -328,13 +361,18 @@ function createProgram(deps: CliDependencies = {}): Command {
       }
 
       const { config } = await loadConfig();
-      const previousState = await loadProjectState(process.cwd());
-      const defaultTargets = previousState && Object.keys(previousState.targets).length > 0 ? Object.keys(previousState.targets) : config.defaultTargets;
-      const selectedTargets = await collectTargets({ canPrompt: canPrompt(), prompt }, options.target, defaultTargets);
+      const previousState = await loadScopeState(scope, process.cwd());
+      const defaultTargets =
+        previousState && Object.keys(previousState.targets).length > 0
+          ? Object.keys(previousState.targets)
+          : scope === 'project'
+            ? config.defaultTargets
+            : [];
+      const selectedTargets = await collectTargets({ canPrompt: canPrompt(), prompt }, options.target, defaultTargets, scope);
 
       if (selectedPresets.usedPrompt || selectedTargets.usedPrompt) {
         const confirmed = await prompt.confirm(
-          `Enable presets [${selectedPresets.values.join(', ')}] with targets [${(selectedTargets.targets.length > 0 ? selectedTargets.targets : defaultTargets).join(', ')}]?`,
+          `Enable presets [${selectedPresets.values.join(', ')}] ${scopeLabel(scope)} with targets [${(selectedTargets.targets.length > 0 ? selectedTargets.targets : defaultTargets).join(', ')}]?`,
         );
         if (!confirmed) {
           throw new PromptCancelledError();
@@ -342,7 +380,8 @@ function createProgram(deps: CliDependencies = {}): Command {
       }
 
       const state = await enablePresets({
-        projectPath: process.cwd(),
+        scope,
+        projectPath: scope === 'project' ? process.cwd() : undefined,
         presetNames: selectedPresets.values,
         targets: selectedTargets.targets,
       });
@@ -351,9 +390,11 @@ function createProgram(deps: CliDependencies = {}): Command {
 
   presetCommand
     .command('disable [names...]')
-    .description('Disable one or more presets in the current project.')
-    .action(async (names: string[] | undefined) => {
-      const previousState = await loadProjectState(process.cwd());
+    .description('Disable one or more presets in the selected scope.')
+    .option('--global', 'Disable from global scope instead of the current project.')
+    .action(async (names: string[] | undefined, options: { global?: boolean }) => {
+      const scope: ActivationScope = options.global ? 'global' : 'project';
+      const previousState = await loadScopeState(scope, process.cwd());
       const enabledPresets = previousState?.enabledPresets ?? [];
       const selected = await collectMany(
         { canPrompt: canPrompt(), prompt },
@@ -370,14 +411,15 @@ function createProgram(deps: CliDependencies = {}): Command {
       }
 
       if (selected.usedPrompt) {
-        const confirmed = await prompt.confirm(`Disable presets [${selected.values.join(', ')}]?`);
+        const confirmed = await prompt.confirm(`Disable presets [${selected.values.join(', ')}] from the ${scopeNoun(scope)} scope?`);
         if (!confirmed) {
           throw new PromptCancelledError();
         }
       }
 
       const state = await disablePresets({
-        projectPath: process.cwd(),
+        scope,
+        projectPath: scope === 'project' ? process.cwd() : undefined,
         presetNames: selected.values,
       });
       printStdout(renderJson(state));
@@ -546,17 +588,19 @@ function createProgram(deps: CliDependencies = {}): Command {
 
   program
     .command('sync')
-    .description('Reconcile target installations so they match `.skm/state.json`.')
-    .action(async () => {
-      const state = await syncProject(process.cwd());
+    .description('Reconcile target installations so they match the selected scope state.')
+    .option('--global', 'Sync global scope instead of the current project.')
+    .action(async (options: { global?: boolean }) => {
+      const state = options.global ? await syncGlobal() : await syncProject(process.cwd());
       printStdout(renderJson(state));
     });
 
   program
     .command('doctor')
-    .description('Inspect project state drift, missing sources, stale index, and missing preset definitions.')
-    .action(async () => {
-      const issues = await doctorProject(process.cwd());
+    .description('Inspect selected scope drift, missing sources, stale index, and missing preset definitions.')
+    .option('--global', 'Inspect global scope instead of the current project.')
+    .action(async (options: { global?: boolean }) => {
+      const issues = options.global ? await doctorGlobal() : await doctorProject(process.cwd());
       printStdout(renderJson({ ok: issues.length === 0, issues }));
     });
 

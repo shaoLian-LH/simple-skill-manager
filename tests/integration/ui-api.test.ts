@@ -121,10 +121,14 @@ describe.sequential('ui API integration', () => {
 
           const configResponse = await requestJson<{
             skillsDir: string;
+            supportedTargets: string[];
             quickActions: Array<{ id: string; command: string }>;
           }>(`${baseUrl}/api/config`);
           expect(configResponse.status).toBe(200);
           expect(configResponse.body.ok).toBe(true);
+          expect(configResponse.body.data.supportedTargets).toEqual(
+            expect.arrayContaining(['.agents', '.trae', '.kiro', '.claude', '.gemini']),
+          );
           expect(configResponse.body.data.quickActions.length).toBeGreaterThan(0);
           expect(configResponse.body.data.quickActions[0]).toMatchObject({
             id: expect.any(String),

@@ -6,6 +6,7 @@ import {
   STATE_VERSION,
 } from '../constants.js';
 import { SkmError } from '../errors.js';
+import { assertSupportedTargets } from '../install/targets.js';
 import type { ProjectState } from '../types.js';
 import { ensureDir, pathExists, readJsonFile, writeJsonFileAtomic } from '../utils/fs.js';
 import { nowIso } from '../utils/time.js';
@@ -77,6 +78,8 @@ function validateProjectState(state: ProjectState, sourcePath: string): void {
       details: sourcePath,
     });
   }
+
+  assertSupportedTargets(Object.keys(state.targets));
 
   if (!Array.isArray(state.enabledSkills) || !Array.isArray(state.enabledPresets)) {
     throw new SkmError('config', 'Project state has invalid enabled arrays.', {

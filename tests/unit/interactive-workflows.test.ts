@@ -193,4 +193,36 @@ describe('interactive workflows', () => {
       expect(stdout).toContain('No skills are available to update preset definitions.');
     });
   });
+
+  it('describes global target locations in interactive target prompts', async () => {
+    await withTempDir('skm-home-', async (homeDir) => {
+      process.env.HOME = homeDir;
+      const skillsDir = path.join(homeDir, 'skills-registry');
+      await createSkillFixtures(skillsDir, [{ dirName: 'brainstorming', name: 'brainstorming' }]);
+      await initConfigWithSkills(homeDir, skillsDir);
+
+      vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
+      const promptAdapter = new FakePromptAdapter({
+        selectMany: [['brainstorming'], ['.gemini']],
+        confirm: [false],
+      });
+
+      const exitCode = await runCli(['node', 'skm', 'skill', 'enable', '--global'], {
+        promptAdapter,
+        isInteractiveSession: () => true,
+      });
+
+      expect(exitCode).toBe(0);
+      expect(promptAdapter.calls.selectMany[1]?.choices).toEqual(
+        expect.arrayContaining([
+          {
+            value: '.gemini',
+            label: '.gemini',
+            description: 'Install into ~/.gemini/commands.',
+          },
+        ]),
+      );
+      expect(promptAdapter.calls.confirm[0]?.message).toContain('globally');
+    });
+  });
 });

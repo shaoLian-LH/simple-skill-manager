@@ -1,5 +1,6 @@
 import { SkmError } from '../../core/errors.js';
-import type { TargetName } from '../../core/types.js';
+import { describeTargetInstallLocation } from '../../core/install/targets.js';
+import type { ActivationScope, TargetName } from '../../core/types.js';
 import { SUPPORTED_TARGETS } from '../../core/types.js';
 import type { PromptAdapter, PromptChoice } from './adapter.js';
 
@@ -86,6 +87,7 @@ export async function collectTargets(
   context: CollectContext,
   provided: string[] | undefined,
   initial: string[],
+  scope: ActivationScope = 'project',
 ): Promise<{ targets: string[]; usedPrompt: boolean }> {
   const normalized = stableUnique(provided ?? []);
   if (normalized.length > 0) {
@@ -101,7 +103,10 @@ export async function collectTargets(
     SUPPORTED_TARGETS.map((target) => ({
       value: target,
       label: target,
-      description: `Install skills into ${target}/skills in the current project.`,
+      description:
+        scope === 'global'
+          ? `Install into ${describeTargetInstallLocation({ scope, target })}.`
+          : `Install into ${describeTargetInstallLocation({ scope, target, projectPath: process.cwd() })}.`,
     })),
     { min: 1, initial: stableUnique(initial) },
   );

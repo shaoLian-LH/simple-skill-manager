@@ -7,6 +7,7 @@ import {
   GLOBAL_CONFIG_FILE,
   GLOBAL_PRESETS_FILE,
   GLOBAL_PROJECTS_FILE,
+  GLOBAL_STATE_FILE,
 } from '../constants.js';
 
 export interface GlobalPaths {
@@ -14,6 +15,7 @@ export interface GlobalPaths {
   configFile: string;
   presetsFile: string;
   projectsFile: string;
+  globalStateFile: string;
   skillsDir: string;
   defaultSkillsDir: string;
 }
@@ -26,6 +28,7 @@ export function getGlobalPaths(homeDir = os.homedir()): GlobalPaths {
     configFile: path.join(appDir, GLOBAL_CONFIG_FILE),
     presetsFile: path.join(appDir, GLOBAL_PRESETS_FILE),
     projectsFile: path.join(appDir, GLOBAL_PROJECTS_FILE),
+    globalStateFile: path.join(appDir, GLOBAL_STATE_FILE),
     skillsDir: path.join(appDir, DEFAULT_SKILLS_SUBDIR),
     defaultSkillsDir: path.join(appDir, DEFAULT_SKILLS_SUBDIR),
   };

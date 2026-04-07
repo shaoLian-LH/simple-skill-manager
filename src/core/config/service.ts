@@ -72,6 +72,8 @@ export async function loadConfig(): Promise<{ config: Config; paths: GlobalPaths
     });
   }
 
+  assertSupportedTargets(config.defaultTargets);
+
   return {
     config,
     paths,

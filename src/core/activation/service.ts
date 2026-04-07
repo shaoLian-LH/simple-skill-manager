@@ -1,3 +1,4 @@
+import fs from 'node:fs/promises';
 import path from 'node:path';
 
 import { STATE_VERSION } from '../constants.js';
@@ -10,54 +11,146 @@ import {
   preflightInstallConflicts,
   removeManagedInstall,
   restoreInstallChanges,
+  type ManagedInstallBatchOptions,
+  type ManagedInstallPlan,
+  type ManagedInstallPlanResolver,
 } from '../install/installer.js';
-import { assertSupportedTargets } from '../install/targets.js';
+import {
+  assertSupportedTargets,
+  getTargetSpec,
+  resolveManagedInstallPath,
+  resolveTargetInstallBasePath,
+} from '../install/targets.js';
 import { createProjectIndexEntry, loadProjectsIndex, mirrorProjectState, saveProjectsIndex } from '../project/projects-index.js';
 import { ensureProjectGitignore } from '../project/gitignore.js';
 import { listPresets } from '../registry/presets.js';
 import { getSkillByName } from '../registry/skills.js';
-import { createEmptyProjectState, ensureProjectStateDir, getProjectStatePath, loadProjectState, saveProjectState } from '../state/project-state.js';
-import type { Config, DoctorIssue, ProjectIndexEntry, ProjectState, SkillDefinition, TargetName } from '../types.js';
+import { createEmptyGlobalState, getGlobalStatePath, loadGlobalState, saveGlobalState } from '../state/global-state.js';
+import {
+  createEmptyProjectState,
+  ensureProjectStateDir,
+  getProjectStateDir,
+  getProjectStatePath,
+  loadProjectState,
+  saveProjectState,
+} from '../state/project-state.js';
+import type {
+  ActivationScope,
+  ActivationState,
+  Config,
+  DoctorIssue,
+  GlobalState,
+  InstallMode,
+  ProjectIndexEntry,
+  ProjectState,
+  ScopedState,
+  SkillDefinition,
+  TargetName,
+} from '../types.js';
 import { uniqueSorted } from '../utils/collection.js';
 import { pathExists, removePath } from '../utils/fs.js';
 import { nowIso } from '../utils/time.js';
 
+type LoadedPaths = Awaited<ReturnType<typeof loadConfig>>['paths'];
+
 export interface EnableSkillsRequest {
-  projectPath: string;
+  scope?: ActivationScope;
+  projectPath?: string;
   skillNames: string[];
   targets: string[];
 }
 
 export interface DisableSkillsRequest {
-  projectPath: string;
+  scope?: ActivationScope;
+  projectPath?: string;
   skillNames: string[];
 }
 
 export interface EnablePresetsRequest {
-  projectPath: string;
+  scope?: ActivationScope;
+  projectPath?: string;
   presetNames: string[];
   targets: string[];
 }
 
 export interface DisablePresetsRequest {
-  projectPath: string;
+  scope?: ActivationScope;
+  projectPath?: string;
   presetNames: string[];
 }
 
 interface ProjectContext {
+  scope: 'project';
   projectPath: string;
   config: Config;
   previousState: ProjectState;
   hadPreviousState: boolean;
-  projectsFilePath: string;
-  presetsFilePath: string;
+  paths: LoadedPaths;
 }
 
-function getExistingTargets(state: ProjectState): TargetName[] {
+interface GlobalContext {
+  scope: 'global';
+  config: Config;
+  previousState: GlobalState;
+  hadPreviousState: boolean;
+  paths: LoadedPaths;
+}
+
+type ScopedContext = ProjectContext | GlobalContext;
+
+function normalizeScope(scope?: ActivationScope): ActivationScope {
+  return scope ?? 'project';
+}
+
+function requireProjectPath(projectPath: string | undefined): string {
+  if (!projectPath || projectPath.trim().length === 0) {
+    throw new SkmError('usage', 'Project path is required for project-scoped operations.', {
+      hint: 'Run the command inside a project directory or provide a project path.',
+    });
+  }
+
+  return projectPath;
+}
+
+function getProjectPathForScope(context: ScopedContext): string | undefined {
+  return context.scope === 'project' ? context.projectPath : undefined;
+}
+
+function createEmptyState(scope: 'project', projectPath: string): ProjectState;
+function createEmptyState(scope: 'global'): GlobalState;
+function createEmptyState(scope: ActivationScope, projectPath?: string): ScopedState {
+  if (scope === 'project') {
+    return createEmptyProjectState(requireProjectPath(projectPath));
+  }
+
+  return createEmptyGlobalState();
+}
+
+function getExistingTargets(state: ActivationState): TargetName[] {
   return Object.keys(state.targets) as TargetName[];
 }
 
-function resolveActiveTargets(requestedTargets: string[], config: Config, state: ProjectState): TargetName[] {
+function getManagedSkillNames(state: ActivationState): string[] {
+  const names = new Set<string>(state.enabledSkills);
+  for (const targetState of Object.values(state.targets)) {
+    if (!targetState) {
+      continue;
+    }
+
+    for (const skillName of Object.keys(targetState.skills)) {
+      names.add(skillName);
+    }
+  }
+
+  return uniqueSorted(names);
+}
+
+function resolveActiveTargets(
+  requestedTargets: string[],
+  scope: ActivationScope,
+  config: Config,
+  state: ActivationState,
+): TargetName[] {
   assertSupportedTargets(requestedTargets);
 
   if (requestedTargets.length > 0) {
@@ -69,20 +162,39 @@ function resolveActiveTargets(requestedTargets: string[], config: Config, state:
     return uniqueSorted(existingTargets) as TargetName[];
   }
 
-  return uniqueSorted(config.defaultTargets) as TargetName[];
+  if (scope === 'project') {
+    return uniqueSorted(config.defaultTargets) as TargetName[];
+  }
+
+  return [];
 }
 
-async function buildProjectContext(projectPath: string): Promise<ProjectContext> {
+async function buildScopedContext(scope: 'project', projectPath: string): Promise<ProjectContext>;
+async function buildScopedContext(scope: 'global'): Promise<GlobalContext>;
+async function buildScopedContext(scope: ActivationScope, projectPath?: string): Promise<ScopedContext> {
   const { config, paths } = await loadConfig();
-  const existingState = await loadProjectState(projectPath);
 
+  if (scope === 'project') {
+    const resolvedProjectPath = requireProjectPath(projectPath);
+    const existingState = await loadProjectState(resolvedProjectPath);
+
+    return {
+      scope,
+      projectPath: resolvedProjectPath,
+      config,
+      previousState: existingState ?? createEmptyProjectState(resolvedProjectPath),
+      hadPreviousState: existingState !== null,
+      paths,
+    };
+  }
+
+  const existingState = await loadGlobalState(paths);
   return {
-    projectPath,
+    scope,
     config,
-    previousState: existingState ?? createEmptyProjectState(projectPath),
+    previousState: existingState ?? createEmptyGlobalState(),
     hadPreviousState: existingState !== null,
-    projectsFilePath: paths.projectsFile,
-    presetsFilePath: paths.presetsFile,
+    paths,
   };
 }
 
@@ -98,7 +210,7 @@ function assertNoMissingPresetDefinitions(presetNames: string[], presets: Record
 
   throw new SkmError('config', `Preset definitions are missing for ${missing.join(', ')}.`, {
     details: `Failed while ${operation}.`,
-    hint: `Recreate the missing presets or run \`skm preset disable ${missing.join(' ')}\` in this project.`,
+    hint: `Recreate the missing presets or run \`skm preset disable ${missing.join(' ')}\` in this scope.`,
   });
 }
 
@@ -107,6 +219,20 @@ async function resolveSkills(skillsDir: string, names: string[]): Promise<Map<st
   for (const name of uniqueSorted(names)) {
     resolved.set(name, await getSkillByName(skillsDir, name));
   }
+  return resolved;
+}
+
+async function resolveKnownSkills(skillsDir: string, names: string[]): Promise<Map<string, SkillDefinition>> {
+  const resolved = new Map<string, SkillDefinition>();
+
+  for (const name of uniqueSorted(names)) {
+    try {
+      resolved.set(name, await getSkillByName(skillsDir, name));
+    } catch {
+      continue;
+    }
+  }
+
   return resolved;
 }
 
@@ -121,21 +247,39 @@ function expandPresetSkillsFromMap(presetNames: string[], presets: Record<string
   return uniqueSorted(skillNames);
 }
 
-function buildState(
-  projectPath: string,
-  previousState: ProjectState,
+function assertEnableTargets(scope: ActivationScope, activeTargets: TargetName[]): void {
+  if (activeTargets.length > 0) {
+    return;
+  }
+
+  if (scope === 'global') {
+    throw new SkmError('usage', 'At least one target is required for global enable operations.', {
+      hint: 'Pass `--target <target>` or first establish global targets through an interactive selection.',
+    });
+  }
+
+  throw new SkmError('usage', 'At least one target is required to enable skills or presets.', {
+    hint: 'Pass `--target <target>` or configure `defaultTargets` in `config.json`.',
+  });
+}
+
+function buildState<TState extends ScopedState>(
+  context: ScopedContext,
+  previousState: TState,
   activeTargets: TargetName[],
   enabledSkills: string[],
   enabledPresets: string[],
   resolvedSkills: Map<string, SkillDefinition>,
   updatedAt = nowIso(),
-): ProjectState {
+): TState {
   const skillNames = uniqueSorted(resolvedSkills.keys());
-  const nextTargets: ProjectState['targets'] = {};
+  const nextTargets: ActivationState['targets'] = {};
 
   if (skillNames.length > 0) {
     for (const target of activeTargets) {
-      const nextSkills: NonNullable<ProjectState['targets'][TargetName]>['skills'] = {};
+      const nextSkills: NonNullable<ActivationState['targets'][TargetName]>['skills'] = {};
+      const defaultInstallMode: InstallMode = getTargetSpec(target).installKind === 'gemini-command' ? 'generated' : 'symlink';
+
       for (const skillName of skillNames) {
         const skill = resolvedSkills.get(skillName);
         if (!skill) {
@@ -150,7 +294,7 @@ function buildState(
             }
           : {
               sourcePath: skill.dirPath,
-              installMode: 'symlink',
+              installMode: defaultInstallMode,
               installedAt: updatedAt,
             };
       }
@@ -159,88 +303,213 @@ function buildState(
     }
   }
 
-  return {
+  const baseState: ActivationState = {
     version: STATE_VERSION,
-    projectPath,
     targets: nextTargets,
     enabledSkills: uniqueSorted(enabledSkills),
     enabledPresets: uniqueSorted(enabledPresets),
     updatedAt,
   };
-}
 
-async function restorePreviousState(context: ProjectContext, previousIndexEntry: ProjectIndexEntry | undefined): Promise<void> {
-  if (context.hadPreviousState) {
-    await saveProjectState(context.projectPath, context.previousState);
-  } else {
-    await removePath(getProjectStatePath(context.projectPath));
-    const stateDir = path.join(context.projectPath, '.skm');
-    if (!(await pathExists(getProjectStatePath(context.projectPath)))) {
-      await removePath(stateDir);
-    }
+  if (context.scope === 'project') {
+    return {
+      ...baseState,
+      projectPath: context.projectPath,
+    } as TState;
   }
 
-  const currentIndex = await loadProjectsIndex(context.projectsFilePath);
+  return baseState as TState;
+}
+
+async function saveScopedState(context: ProjectContext, state: ProjectState): Promise<void>;
+async function saveScopedState(context: GlobalContext, state: GlobalState): Promise<void>;
+async function saveScopedState(context: ScopedContext, state: ScopedState): Promise<void> {
+  if (context.scope === 'project') {
+    await saveProjectState(context.projectPath, state as ProjectState);
+    return;
+  }
+
+  await saveGlobalState(state as GlobalState, context.paths);
+}
+
+async function removeScopedState(context: ScopedContext): Promise<void> {
+  if (context.scope === 'project') {
+    await removePath(getProjectStatePath(context.projectPath));
+    await removePath(getProjectStateDir(context.projectPath));
+    return;
+  }
+
+  await removePath(getGlobalStatePath(context.paths));
+}
+
+async function restorePreviousState(context: ScopedContext, previousIndexEntry: ProjectIndexEntry | undefined): Promise<void> {
+  if (context.hadPreviousState) {
+    await saveScopedState(context as never, context.previousState as never);
+  } else {
+    await removeScopedState(context);
+  }
+
+  if (context.scope !== 'project') {
+    return;
+  }
+
+  const currentIndex = await loadProjectsIndex(context.paths.projectsFile);
   if (previousIndexEntry) {
     currentIndex.projects[context.projectPath] = previousIndexEntry;
   } else {
     delete currentIndex.projects[context.projectPath];
   }
-  await saveProjectsIndex(context.projectsFilePath, currentIndex);
+  await saveProjectsIndex(context.paths.projectsFile, currentIndex);
 }
 
-async function removeObsoleteInstalls(projectPath: string, previousState: ProjectState, nextState: ProjectState): Promise<void> {
-  for (const [target, targetState] of Object.entries(previousState.targets) as Array<[TargetName, NonNullable<ProjectState['targets'][TargetName]>]>) {
-    for (const skillName of Object.keys(targetState.skills)) {
+function buildGeminiCommandContent(skill: SkillDefinition): string {
+  return `description = ${JSON.stringify(skill.description)}\nprompt = ${JSON.stringify(skill.body.trim())}\n`;
+}
+
+function createInstallPlanResolver(
+  scope: ActivationScope,
+  projectPath: string | undefined,
+  skills: Map<string, SkillDefinition>,
+): ManagedInstallPlanResolver {
+  return ({ target, skillName, skill, previousRecord }): ManagedInstallPlan => {
+    const installPath = resolveManagedInstallPath({
+      scope,
+      projectPath,
+      target,
+      skillName,
+    });
+    const cleanupRootPath = resolveTargetInstallBasePath({
+      scope,
+      projectPath,
+      target,
+    });
+    const spec = getTargetSpec(target);
+
+    if (spec.installKind === 'gemini-command') {
+      const resolvedSkill = skill ?? skills.get(skillName);
+      return {
+        installPath,
+        installKind: 'generated-file',
+        cleanupRootPath,
+        generatedContent: resolvedSkill ? buildGeminiCommandContent(resolvedSkill) : undefined,
+      };
+    }
+
+    return {
+      installPath,
+      installKind: 'skill-directory',
+      cleanupRootPath,
+      preferredMode: previousRecord?.installMode === 'copy' ? 'copy' : 'symlink',
+    };
+  };
+}
+
+async function prepareInstallSkills(
+  context: ScopedContext,
+  nextState: ScopedState,
+  resolvedSkills: Map<string, SkillDefinition>,
+): Promise<Map<string, SkillDefinition>> {
+  const installSkills = new Map(resolvedSkills);
+  const missingNames = getManagedSkillNames(context.previousState).filter((name) => !installSkills.has(name));
+
+  if (missingNames.length === 0) {
+    return installSkills;
+  }
+
+  const missingSkills = await resolveKnownSkills(context.config.skillsDir, missingNames);
+  for (const [name, skill] of missingSkills.entries()) {
+    installSkills.set(name, skill);
+  }
+
+  for (const name of getManagedSkillNames(nextState)) {
+    const skill = resolvedSkills.get(name);
+    if (skill) {
+      installSkills.set(name, skill);
+    }
+  }
+
+  return installSkills;
+}
+
+async function removeObsoleteInstalls(
+  context: ScopedContext,
+  previousState: ScopedState,
+  nextState: ScopedState,
+  installOptions: ManagedInstallBatchOptions,
+): Promise<void> {
+  for (const [target, targetState] of Object.entries(previousState.targets) as Array<[TargetName, NonNullable<ActivationState['targets'][TargetName]>]>) {
+    for (const [skillName, record] of Object.entries(targetState.skills)) {
       if (nextState.targets[target]?.skills[skillName]) {
         continue;
       }
 
-      await removeManagedInstall(projectPath, target, skillName);
+      await removeManagedInstall(context.scope, target, skillName, {
+        ...installOptions,
+        record,
+        previousRecord: record,
+      });
     }
   }
 }
 
-async function reconcileState(
-  context: ProjectContext,
-  nextState: ProjectState,
+async function reconcileState<TState extends ScopedState>(
+  context: ScopedContext,
+  nextState: TState,
+  resolvedSkills: Map<string, SkillDefinition>,
   options: { ensureGitignore?: boolean } = {},
-): Promise<ProjectState> {
-  const previousIndex = await loadProjectsIndex(context.projectsFilePath);
-  const previousIndexEntry = previousIndex.projects[context.projectPath];
+): Promise<TState> {
+  const previousIndex =
+    context.scope === 'project'
+      ? await loadProjectsIndex(context.paths.projectsFile)
+      : null;
+  const previousIndexEntry = context.scope === 'project' ? previousIndex?.projects[context.projectPath] : undefined;
 
-  if (options.ensureGitignore) {
+  if (options.ensureGitignore && context.scope === 'project') {
     await ensureProjectGitignore(context.projectPath);
   }
 
-  await ensureProjectStateDir(context.projectPath);
-  await preflightInstallConflicts(context.projectPath, nextState, context.previousState);
-  await saveProjectState(context.projectPath, nextState);
+  if (context.scope === 'project') {
+    await ensureProjectStateDir(context.projectPath);
+  }
 
-  const installChanges = await backupChangedManagedPaths(context.projectPath, nextState, context.previousState);
+  const installSkills = await prepareInstallSkills(context, nextState, resolvedSkills);
+  const installOptions: ManagedInstallBatchOptions = {
+    projectPath: getProjectPathForScope(context),
+    skills: installSkills,
+    resolveInstallPlan: createInstallPlanResolver(context.scope, getProjectPathForScope(context), installSkills),
+  };
+
+  await preflightInstallConflicts(context.scope, nextState, context.previousState, installOptions);
+  await saveScopedState(context as never, nextState as never);
+
+  const installChanges = await backupChangedManagedPaths(context.scope, nextState, context.previousState, installOptions);
 
   try {
-    await removeObsoleteInstalls(context.projectPath, context.previousState, nextState);
-    const installedState = await applyManagedInstalls(context.projectPath, nextState, context.previousState);
+    await removeObsoleteInstalls(context, context.previousState, nextState, installOptions);
+    const installedState = await applyManagedInstalls(context.scope, nextState, context.previousState, installOptions);
     installedState.updatedAt = nowIso();
-    await saveProjectState(context.projectPath, installedState);
+    await saveScopedState(context as never, installedState as never);
 
-    const nextIndex = mirrorProjectState(previousIndex, installedState);
-    await saveProjectsIndex(context.projectsFilePath, nextIndex);
+    if (context.scope === 'project' && previousIndex) {
+      const nextIndex = mirrorProjectState(previousIndex, installedState as ProjectState);
+      await saveProjectsIndex(context.paths.projectsFile, nextIndex);
+    }
+
     await commitInstallChanges(installChanges);
     return installedState;
   } catch (error) {
     await restoreInstallChanges(installChanges);
     try {
-      await applyManagedInstalls(context.projectPath, context.previousState, createEmptyProjectState(context.projectPath));
+      const rollbackState = createEmptyState(context.scope, getProjectPathForScope(context));
+      await applyManagedInstalls(context.scope, context.previousState, rollbackState as typeof context.previousState, installOptions);
     } catch {
-      // best-effort rollback; state/index restoration still follows
+      // best-effort rollback
     }
     await restorePreviousState(context, previousIndexEntry);
 
-    throw new SkmError('runtime', 'Failed to reconcile project state.', {
+    throw new SkmError('runtime', `Failed to reconcile ${context.scope} state.`, {
       details: error instanceof Error ? error.message : undefined,
-      hint: 'Fix the reported issue and run `skm sync` to restore the project state.',
+      hint: `Fix the reported issue and run \`skm sync${context.scope === 'global' ? ' --global' : ''}\` to restore the state.`,
       cause: error,
     });
   }
@@ -259,7 +528,8 @@ function stableUnique(names: string[]): string[] {
   return next;
 }
 
-export async function enableSkills(request: EnableSkillsRequest): Promise<ProjectState> {
+export async function enableSkills(request: EnableSkillsRequest): Promise<ScopedState> {
+  const scope = normalizeScope(request.scope);
   const skillNames = stableUnique(request.skillNames);
   if (skillNames.length === 0) {
     throw new SkmError('usage', 'At least one skill name is required.', {
@@ -267,27 +537,23 @@ export async function enableSkills(request: EnableSkillsRequest): Promise<Projec
     });
   }
 
-  const context = await buildProjectContext(request.projectPath);
+  const context = await buildScopedContext(scope, request.projectPath);
   const presets = await listPresets();
   assertNoMissingPresetDefinitions(context.previousState.enabledPresets, presets, 'enabling skills');
 
-  const activeTargets = resolveActiveTargets(request.targets, context.config, context.previousState);
+  const activeTargets = resolveActiveTargets(request.targets, scope, context.config, context.previousState);
+  assertEnableTargets(scope, activeTargets);
+
   const enabledSkills = uniqueSorted([...context.previousState.enabledSkills, ...skillNames]);
   const presetSkills = expandPresetSkillsFromMap(context.previousState.enabledPresets, presets);
   const resolvedSkills = await resolveSkills(context.config.skillsDir, [...enabledSkills, ...presetSkills]);
-  const nextState = buildState(
-    request.projectPath,
-    context.previousState,
-    activeTargets,
-    enabledSkills,
-    context.previousState.enabledPresets,
-    resolvedSkills,
-  );
+  const nextState = buildState(context, context.previousState, activeTargets, enabledSkills, context.previousState.enabledPresets, resolvedSkills);
 
-  return reconcileState(context, nextState, { ensureGitignore: true });
+  return reconcileState(context, nextState, resolvedSkills, { ensureGitignore: scope === 'project' });
 }
 
-export async function disableSkills(request: DisableSkillsRequest): Promise<ProjectState> {
+export async function disableSkills(request: DisableSkillsRequest): Promise<ScopedState> {
+  const scope = normalizeScope(request.scope);
   const skillNames = stableUnique(request.skillNames);
   if (skillNames.length === 0) {
     throw new SkmError('usage', 'At least one skill name is required.', {
@@ -295,7 +561,7 @@ export async function disableSkills(request: DisableSkillsRequest): Promise<Proj
     });
   }
 
-  const context = await buildProjectContext(request.projectPath);
+  const context = await buildScopedContext(scope, request.projectPath);
   const presets = await listPresets();
   assertNoMissingPresetDefinitions(context.previousState.enabledPresets, presets, 'disabling skills');
 
@@ -303,19 +569,13 @@ export async function disableSkills(request: DisableSkillsRequest): Promise<Proj
   const presetSkills = expandPresetSkillsFromMap(context.previousState.enabledPresets, presets);
   const resolvedSkills = await resolveSkills(context.config.skillsDir, [...enabledSkills, ...presetSkills]);
   const activeTargets = resolvedSkills.size > 0 ? getExistingTargets(context.previousState) : [];
-  const nextState = buildState(
-    request.projectPath,
-    context.previousState,
-    activeTargets,
-    enabledSkills,
-    context.previousState.enabledPresets,
-    resolvedSkills,
-  );
+  const nextState = buildState(context, context.previousState, activeTargets, enabledSkills, context.previousState.enabledPresets, resolvedSkills);
 
-  return reconcileState(context, nextState);
+  return reconcileState(context, nextState, resolvedSkills);
 }
 
-export async function enablePresets(request: EnablePresetsRequest): Promise<ProjectState> {
+export async function enablePresets(request: EnablePresetsRequest): Promise<ScopedState> {
+  const scope = normalizeScope(request.scope);
   const presetNames = stableUnique(request.presetNames);
   if (presetNames.length === 0) {
     throw new SkmError('usage', 'At least one preset name is required.', {
@@ -323,27 +583,23 @@ export async function enablePresets(request: EnablePresetsRequest): Promise<Proj
     });
   }
 
-  const context = await buildProjectContext(request.projectPath);
+  const context = await buildScopedContext(scope, request.projectPath);
   const presets = await listPresets();
-  const activeTargets = resolveActiveTargets(request.targets, context.config, context.previousState);
+  const activeTargets = resolveActiveTargets(request.targets, scope, context.config, context.previousState);
+  assertEnableTargets(scope, activeTargets);
+
   const enabledPresets = uniqueSorted([...context.previousState.enabledPresets, ...presetNames]);
   assertNoMissingPresetDefinitions(enabledPresets, presets, 'enabling presets');
 
   const presetSkills = expandPresetSkillsFromMap(enabledPresets, presets);
   const resolvedSkills = await resolveSkills(context.config.skillsDir, [...context.previousState.enabledSkills, ...presetSkills]);
-  const nextState = buildState(
-    request.projectPath,
-    context.previousState,
-    activeTargets,
-    context.previousState.enabledSkills,
-    enabledPresets,
-    resolvedSkills,
-  );
+  const nextState = buildState(context, context.previousState, activeTargets, context.previousState.enabledSkills, enabledPresets, resolvedSkills);
 
-  return reconcileState(context, nextState, { ensureGitignore: true });
+  return reconcileState(context, nextState, resolvedSkills, { ensureGitignore: scope === 'project' });
 }
 
-export async function disablePresets(request: DisablePresetsRequest): Promise<ProjectState> {
+export async function disablePresets(request: DisablePresetsRequest): Promise<ScopedState> {
+  const scope = normalizeScope(request.scope);
   const presetNames = stableUnique(request.presetNames);
   if (presetNames.length === 0) {
     throw new SkmError('usage', 'At least one preset name is required.', {
@@ -351,7 +607,7 @@ export async function disablePresets(request: DisablePresetsRequest): Promise<Pr
     });
   }
 
-  const context = await buildProjectContext(request.projectPath);
+  const context = await buildScopedContext(scope, request.projectPath);
   const enabledPresets = context.previousState.enabledPresets.filter((entry) => !presetNames.includes(entry));
   const presets = await listPresets();
   assertNoMissingPresetDefinitions(enabledPresets, presets, 'disabling presets');
@@ -359,62 +615,58 @@ export async function disablePresets(request: DisablePresetsRequest): Promise<Pr
   const presetSkills = expandPresetSkillsFromMap(enabledPresets, presets);
   const resolvedSkills = await resolveSkills(context.config.skillsDir, [...context.previousState.enabledSkills, ...presetSkills]);
   const activeTargets = resolvedSkills.size > 0 ? getExistingTargets(context.previousState) : [];
-  const nextState = buildState(
-    request.projectPath,
-    context.previousState,
-    activeTargets,
-    context.previousState.enabledSkills,
-    enabledPresets,
-    resolvedSkills,
-  );
+  const nextState = buildState(context, context.previousState, activeTargets, context.previousState.enabledSkills, enabledPresets, resolvedSkills);
 
-  return reconcileState(context, nextState);
+  return reconcileState(context, nextState, resolvedSkills);
 }
 
 export async function enableSkill(projectPath: string, skillName: string, requestedTargets: string[]): Promise<ProjectState> {
-  return enableSkills({ projectPath, skillNames: [skillName], targets: requestedTargets });
+  return enableSkills({ scope: 'project', projectPath, skillNames: [skillName], targets: requestedTargets }) as Promise<ProjectState>;
 }
 
 export async function enablePreset(projectPath: string, presetName: string, requestedTargets: string[]): Promise<ProjectState> {
-  return enablePresets({ projectPath, presetNames: [presetName], targets: requestedTargets });
+  return enablePresets({ scope: 'project', projectPath, presetNames: [presetName], targets: requestedTargets }) as Promise<ProjectState>;
 }
 
 export async function disableSkill(projectPath: string, skillName: string): Promise<ProjectState> {
-  return disableSkills({ projectPath, skillNames: [skillName] });
+  return disableSkills({ scope: 'project', projectPath, skillNames: [skillName] }) as Promise<ProjectState>;
 }
 
 export async function disablePreset(projectPath: string, presetName: string): Promise<ProjectState> {
-  return disablePresets({ projectPath, presetNames: [presetName] });
+  return disablePresets({ scope: 'project', projectPath, presetNames: [presetName] }) as Promise<ProjectState>;
 }
 
 function indexEntryEquals(left: ProjectIndexEntry | undefined, right: ProjectIndexEntry): boolean {
   return JSON.stringify(left ?? null) === JSON.stringify(right);
 }
 
-async function detectUnexpectedTargetEntries(projectPath: string, state: ProjectState): Promise<DoctorIssue[]> {
+async function detectUnexpectedTargetEntries(
+  scope: ActivationScope,
+  projectPath: string | undefined,
+  state: ActivationState,
+): Promise<DoctorIssue[]> {
   const issues: DoctorIssue[] = [];
-  const fsModule = await import('node:fs/promises');
 
   async function walkUnexpectedEntries(
     target: TargetName,
-    targetSkillsDir: string,
+    targetBasePath: string,
     currentDir: string,
-    expectedSkillNames: Set<string>,
+    expectedRelativePaths: Set<string>,
   ): Promise<void> {
-    const entries = await fsModule.default.readdir(currentDir, { withFileTypes: true });
+    const entries = await fs.readdir(currentDir, { withFileTypes: true });
 
     for (const entry of entries) {
       const entryPath = path.join(currentDir, entry.name);
-      const relativePath = path.relative(targetSkillsDir, entryPath).split(path.sep).join('/');
-      const exactMatch = expectedSkillNames.has(relativePath);
-      const hasManagedDescendant = [...expectedSkillNames].some((skillName) => skillName.startsWith(`${relativePath}/`));
+      const relativePath = path.relative(targetBasePath, entryPath).split(path.sep).join('/');
+      const exactMatch = expectedRelativePaths.has(relativePath);
+      const hasManagedDescendant = [...expectedRelativePaths].some((skillPath) => skillPath.startsWith(`${relativePath}/`));
 
       if (exactMatch) {
         continue;
       }
 
       if (entry.isDirectory() && hasManagedDescendant) {
-        await walkUnexpectedEntries(target, targetSkillsDir, entryPath, expectedSkillNames);
+        await walkUnexpectedEntries(target, targetBasePath, entryPath, expectedRelativePaths);
         continue;
       }
 
@@ -429,29 +681,54 @@ async function detectUnexpectedTargetEntries(projectPath: string, state: Project
   }
 
   for (const target of getExistingTargets(state)) {
-    const skillsDir = path.join(projectPath, target, 'skills');
-    if (!(await pathExists(skillsDir))) {
+    const targetBasePath = resolveTargetInstallBasePath({
+      scope,
+      projectPath,
+      target,
+    });
+    if (!(await pathExists(targetBasePath))) {
       continue;
     }
 
-    await walkUnexpectedEntries(target, skillsDir, skillsDir, new Set(Object.keys(state.targets[target]?.skills ?? {})));
+    const expectedRelativePaths = new Set(
+      Object.keys(state.targets[target]?.skills ?? {}).map((skillName) =>
+        path.relative(
+          targetBasePath,
+          resolveManagedInstallPath({
+            scope,
+            projectPath,
+            target,
+            skillName,
+          }),
+        )
+          .split(path.sep)
+          .join('/'),
+      ),
+    );
+    await walkUnexpectedEntries(target, targetBasePath, targetBasePath, expectedRelativePaths);
   }
 
   return issues;
 }
 
-export async function doctorProject(projectPath: string): Promise<DoctorIssue[]> {
-  const context = await buildProjectContext(projectPath);
+function getMissingStateError(scope: ActivationScope): SkmError {
+  return new SkmError('config', `${scope === 'global' ? 'Global' : 'Project'} state is missing.`, {
+    hint:
+      scope === 'global'
+        ? 'Run `skm skill enable --global <name> --target <target>` or `skm preset enable --global <name> --target <target>` first.'
+        : 'Run `skm skill enable <name>` or `skm preset enable <name>` first.',
+  });
+}
+
+async function doctorScope(scope: ActivationScope, projectPath?: string): Promise<DoctorIssue[]> {
+  const context = await buildScopedContext(scope, projectPath);
   if (!context.hadPreviousState) {
-    throw new SkmError('config', 'Project state is missing.', {
-      hint: 'Run `skm skill enable <name>` or `skm preset enable <name>` first.',
-    });
+    throw getMissingStateError(scope);
   }
 
   const issues: DoctorIssue[] = [];
-  const fsModule = await import('node:fs/promises');
-  const projectsIndex = await loadProjectsIndex(context.projectsFilePath);
   const presets = await listPresets();
+  const resolvedSkills = await resolveKnownSkills(context.config.skillsDir, getManagedSkillNames(context.previousState));
 
   for (const presetName of context.previousState.enabledPresets) {
     if (presets[presetName]) {
@@ -461,12 +738,12 @@ export async function doctorProject(projectPath: string): Promise<DoctorIssue[]>
     issues.push({
       type: 'missing-preset-definition',
       presetName,
-      path: context.presetsFilePath,
-      message: `Preset ${presetName} is enabled in project state but missing from ${context.presetsFilePath}.`,
+      path: context.paths.presetsFile,
+      message: `Preset ${presetName} is enabled in ${scope} state but missing from ${context.paths.presetsFile}.`,
     });
   }
 
-  for (const [target, targetState] of Object.entries(context.previousState.targets) as Array<[TargetName, NonNullable<ProjectState['targets'][TargetName]>]>) {
+  for (const [target, targetState] of Object.entries(context.previousState.targets) as Array<[TargetName, NonNullable<ActivationState['targets'][TargetName]>]>) {
     for (const [skillName, record] of Object.entries(targetState.skills)) {
       if (!(await pathExists(record.sourcePath))) {
         issues.push({
@@ -478,7 +755,12 @@ export async function doctorProject(projectPath: string): Promise<DoctorIssue[]>
         });
       }
 
-      const installPath = path.join(projectPath, target, 'skills', skillName);
+      const installPath = resolveManagedInstallPath({
+        scope,
+        projectPath: getProjectPathForScope(context),
+        target,
+        skillName,
+      });
       if (!(await pathExists(installPath))) {
         issues.push({
           type: 'missing-installation',
@@ -492,7 +774,7 @@ export async function doctorProject(projectPath: string): Promise<DoctorIssue[]>
 
       if (record.installMode === 'symlink') {
         try {
-          const stats = await fsModule.default.lstat(installPath);
+          const stats = await fs.lstat(installPath);
           if (!stats.isSymbolicLink()) {
             issues.push({
               type: 'broken-link',
@@ -503,7 +785,7 @@ export async function doctorProject(projectPath: string): Promise<DoctorIssue[]>
               message: `Expected a symlink at ${installPath}.`,
             });
           } else {
-            const linkTarget = await fsModule.default.readlink(installPath);
+            const linkTarget = await fs.readlink(installPath);
             const resolved = path.resolve(path.dirname(installPath), linkTarget);
             if (resolved !== record.sourcePath) {
               issues.push({
@@ -526,7 +808,7 @@ export async function doctorProject(projectPath: string): Promise<DoctorIssue[]>
             message: `Symlink at ${installPath} could not be verified.`,
           });
         }
-      } else {
+      } else if (record.installMode === 'copy') {
         issues.push({
           type: 'copied-skill-may-have-drifted',
           target,
@@ -535,48 +817,87 @@ export async function doctorProject(projectPath: string): Promise<DoctorIssue[]>
           expectedPath: record.sourcePath,
           message: `Copy-mode installation for ${skillName} at ${installPath} may have drifted from ${record.sourcePath}.`,
         });
+      } else {
+        const skill = resolvedSkills.get(skillName);
+        if (skill) {
+          const expectedContent = buildGeminiCommandContent(skill);
+          const currentContent = await fs.readFile(installPath, 'utf8').catch(() => '');
+          if (currentContent !== expectedContent) {
+            issues.push({
+              type: 'broken-link',
+              target,
+              skillName,
+              path: installPath,
+              expectedPath: record.sourcePath,
+              message: `Generated installation at ${installPath} is out of sync with ${record.sourcePath}.`,
+            });
+          }
+        }
       }
     }
   }
 
-  issues.push(...(await detectUnexpectedTargetEntries(projectPath, context.previousState)));
+  issues.push(...(await detectUnexpectedTargetEntries(scope, getProjectPathForScope(context), context.previousState)));
 
-  const expectedIndexEntry = createProjectIndexEntry(context.previousState);
-  const currentIndexEntry = projectsIndex.projects[projectPath];
-  if (!indexEntryEquals(currentIndexEntry, expectedIndexEntry)) {
-    issues.push({
-      type: 'stale-global-index',
-      path: context.projectsFilePath,
-      message: `Global projects index is stale for ${projectPath}.`,
-    });
+  if (context.scope === 'project') {
+    const projectsIndex = await loadProjectsIndex(context.paths.projectsFile);
+    const expectedIndexEntry = createProjectIndexEntry(context.previousState);
+    const currentIndexEntry = projectsIndex.projects[context.projectPath];
+    if (!indexEntryEquals(currentIndexEntry, expectedIndexEntry)) {
+      issues.push({
+        type: 'stale-global-index',
+        path: context.paths.projectsFile,
+        message: `Global projects index is stale for ${context.projectPath}.`,
+      });
+    }
   }
 
   return issues;
 }
 
-export async function syncProject(projectPath: string): Promise<ProjectState> {
-  const context = await buildProjectContext(projectPath);
+export async function doctorProject(projectPath: string): Promise<DoctorIssue[]> {
+  return doctorScope('project', projectPath);
+}
+
+export async function doctorGlobal(): Promise<DoctorIssue[]> {
+  return doctorScope('global');
+}
+
+async function syncScope(scope: ActivationScope, projectPath?: string): Promise<ScopedState> {
+  const context = await buildScopedContext(scope, projectPath);
   if (!context.hadPreviousState) {
-    throw new SkmError('config', 'Project state is missing.', {
-      hint: 'Re-enable the desired skills or presets to recreate `.skm/state.json`.',
-    });
+    throw getMissingStateError(scope);
   }
 
   const presets = await listPresets();
-  assertNoMissingPresetDefinitions(context.previousState.enabledPresets, presets, 'syncing the project');
+  assertNoMissingPresetDefinitions(context.previousState.enabledPresets, presets, `syncing the ${scope} state`);
 
-  const unexpectedEntries = await detectUnexpectedTargetEntries(projectPath, context.previousState);
+  const unexpectedEntries = await detectUnexpectedTargetEntries(scope, getProjectPathForScope(context), context.previousState);
   if (unexpectedEntries.length > 0) {
     throw new SkmError('conflict', 'Sync refused to overwrite unexpected target entries.', {
       details: unexpectedEntries.map((issue) => issue.path).filter(Boolean).join(', '),
-      hint: 'Remove the unexpected entries or update `.skm/state.json` before running `skm sync` again.',
+      hint: 'Remove the unexpected entries or update the managed state file before running sync again.',
     });
   }
 
-  const nextState: ProjectState = {
+  const presetSkills = expandPresetSkillsFromMap(context.previousState.enabledPresets, presets);
+  const resolvedSkills = await resolveSkills(
+    context.config.skillsDir,
+    uniqueSorted([...context.previousState.enabledSkills, ...presetSkills]),
+  );
+
+  const nextState = {
     ...context.previousState,
     updatedAt: nowIso(),
-  };
+  } as typeof context.previousState;
 
-  return reconcileState(context, nextState);
+  return reconcileState(context, nextState, resolvedSkills);
+}
+
+export async function syncProject(projectPath: string): Promise<ProjectState> {
+  return syncScope('project', projectPath) as Promise<ProjectState>;
+}
+
+export async function syncGlobal(): Promise<GlobalState> {
+  return syncScope('global') as Promise<GlobalState>;
 }
