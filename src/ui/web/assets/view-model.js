@@ -174,6 +174,10 @@ export function buildPresetDeleteConfirmationMessage(preview) {
   }
 
   const name = typeof preview.name === 'string' ? preview.name : 'this preset';
+  if (preview.readonly === true) {
+    return `Preset ${name} is dynamic and read-only. Delete the scope directory instead.`;
+  }
+
   const referenceCount = typeof preview.referenceCount === 'number' ? preview.referenceCount : 0;
   if (referenceCount <= 0) {
     return `Delete preset ${name}?`;

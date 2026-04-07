@@ -113,4 +113,17 @@ describe('ui web view model helpers', () => {
     expect(withRefMessage).toContain('/tmp/b');
     expect(withRefMessage).toContain('Delete preset frontend-v1 anyway?');
   });
+
+  it('builds readonly delete messages for dynamic presets', () => {
+    const readonlyMessage = buildPresetDeleteConfirmationMessage({
+      name: 'impeccable',
+      referenceCount: 0,
+      source: 'dynamic',
+      readonly: true,
+      referenceProjects: [],
+    });
+
+    expect(readonlyMessage).toContain('dynamic and read-only');
+    expect(readonlyMessage).toContain('impeccable');
+  });
 });

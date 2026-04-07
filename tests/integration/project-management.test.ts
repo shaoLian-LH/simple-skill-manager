@@ -222,4 +222,69 @@ describe('project activation and maintenance', () => {
       });
     });
   });
+
+  it('enables and disables dynamic scope presets with scoped skill installs', async () => {
+    await withTempDir('skm-home-', async (homeDir) => {
+      await withTempDir('skm-project-', async (projectDir) => {
+        const skillsDir = path.join(homeDir, 'skills-registry');
+        await createSkillFixtures(skillsDir, [
+          { dirName: 'impeccable/overdrive', name: 'overdrive' },
+          { dirName: 'impeccable/polish', name: 'polish' },
+        ]);
+        await initConfigWithSkills(homeDir, skillsDir);
+
+        await runCli(['preset', 'enable', 'impeccable', '--target', '.agents'], { cwd: projectDir, env: { HOME: homeDir } });
+
+        let state = (await readProjectState(projectDir)) as {
+          enabledPresets: string[];
+          targets: Record<string, { skills: Record<string, unknown> }>;
+        };
+
+        expect(state.enabledPresets).toEqual(['impeccable']);
+        expect(Object.keys(state.targets['.agents']!.skills).sort()).toEqual(['impeccable/overdrive', 'impeccable/polish']);
+        await expect(fs.access(path.join(projectDir, '.agents', 'skills', 'impeccable', 'overdrive'))).resolves.toBeUndefined();
+        await expect(fs.access(path.join(projectDir, '.agents', 'skills', 'impeccable', 'polish'))).resolves.toBeUndefined();
+
+        await runCli(['preset', 'disable', 'impeccable'], { cwd: projectDir, env: { HOME: homeDir } });
+        state = (await readProjectState(projectDir)) as {
+          enabledPresets: string[];
+          targets: Record<string, { skills: Record<string, unknown> }>;
+        };
+
+        expect(state.enabledPresets).toEqual([]);
+        expect(state.targets).toEqual({});
+        await expect(fs.access(path.join(projectDir, '.agents', 'skills', 'impeccable'))).rejects.toThrow();
+      });
+    });
+  });
+
+  it('treats dynamic presets as valid definitions during doctor and sync', async () => {
+    await withTempDir('skm-home-', async (homeDir) => {
+      await withTempDir('skm-project-', async (projectDir) => {
+        const skillsDir = path.join(homeDir, 'skills-registry');
+        await createSkillFixtures(skillsDir, [
+          { dirName: 'impeccable/overdrive', name: 'overdrive' },
+          { dirName: 'impeccable/polish', name: 'polish' },
+        ]);
+        await initConfigWithSkills(homeDir, skillsDir);
+        await runCli(['preset', 'enable', 'impeccable', '--target', '.agents'], { cwd: projectDir, env: { HOME: homeDir } });
+
+        const initialDoctor = JSON.parse((await runCli(['doctor'], { cwd: projectDir, env: { HOME: homeDir } })).stdout) as {
+          ok: boolean;
+        };
+        expect(initialDoctor.ok).toBe(true);
+
+        await fs.rm(path.join(projectDir, '.agents', 'skills', 'impeccable', 'polish'), { recursive: true, force: true });
+        await runCli(['sync'], { cwd: projectDir, env: { HOME: homeDir } });
+
+        const healedDoctor = JSON.parse((await runCli(['doctor'], { cwd: projectDir, env: { HOME: homeDir } })).stdout) as {
+          ok: boolean;
+          issues: Array<{ type: string }>;
+        };
+        expect(healedDoctor.ok).toBe(true);
+        expect(healedDoctor.issues).toEqual([]);
+        await expect(fs.access(path.join(projectDir, '.agents', 'skills', 'impeccable', 'polish'))).resolves.toBeUndefined();
+      });
+    });
+  });
 });

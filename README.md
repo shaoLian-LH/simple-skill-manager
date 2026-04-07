@@ -64,7 +64,7 @@ Once setup is done, everything below is a command quick reference.
 
 | Command | Purpose | Example / note |
 | --- | --- | --- |
-| `skm skill list` | List all discovered skills from the configured `skillsDir`. | `skm skill list` |
+| `skm skill list` | List all discovered skills from the configured `skillsDir`, including scoped skills. | `skm skill list` |
 | `skm skill inspect [name]` | Show the source path, frontmatter, and body preview for one skill. | `skm skill inspect brainstorming` |
 | `skm skill enable [names...] --target <target>` | Enable one or more skills in the current project and install them into one or more targets. | `skm skill enable brainstorming --target .agents` |
 | `skm skill disable [names...]` | Disable explicitly enabled skills in the current project. | `skm skill disable brainstorming` |
@@ -73,6 +73,7 @@ Quick notes:
 - Repeat `--target` to install into multiple targets: `--target .agents --target .trae`
 - If the project already has recorded targets, interactive flows reuse them as defaults; otherwise the global default target is `.agents`
 - In a TTY session, commands with optional names can prompt you to select entries interactively
+- One-level scoped skills are supported as `<scope>/<skill>`. Example: `impeccable/overdrive` resolves from `skillsDir/impeccable/overdrive/SKILL.md`
 
 ### `preset`
 
@@ -91,6 +92,10 @@ Quick notes:
 - Each preset is `preset-name -> [skill-name, ...]`
 - `skm preset enable ...` expands preset names into the skill names stored in `presets.yaml`
 - `skm preset delete ...` warns when the preset is still referenced by project state
+- One-level scope directories also become dynamic read-only presets. Example: `skillsDir/impeccable/*/SKILL.md` exposes a dynamic preset named `impeccable`
+- Dynamic presets expand to scoped skill names such as `impeccable/overdrive`
+- Dynamic presets are discoverable through `preset list` / `preset inspect`, but `preset add/update/delete` only works for static presets in `presets.yaml`
+- If a static preset name collides with a dynamic scope preset name, `skm` fails fast with a conflict error
 
 Example `presets.yaml`:
 
@@ -102,6 +107,10 @@ frontend-basic:
 researcher:
   - deep-research
   - url-to-markdown
+
+design-review:
+  - impeccable/overdrive
+  - impeccable/polish
 ```
 
 ### `sync` and `doctor`

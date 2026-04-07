@@ -8,12 +8,14 @@ import { loadProjectsIndex } from '../../core/project/projects-index.js';
 import {
   addPresetDefinition,
   deletePresetDefinition,
-  listPresets,
+  getPresetDefinitionByName,
+  listPresetDefinitions,
   updatePresetDefinition,
 } from '../../core/registry/presets.js';
 import { listSkills } from '../../core/registry/skills.js';
 import { loadProjectState } from '../../core/state/project-state.js';
 import { SUPPORTED_TARGETS, type ProjectIndexEntry, type TargetName } from '../../core/types.js';
+import type { PresetDefinition } from '../../core/types.js';
 import type {
   BootView,
   ConfigView,
@@ -147,6 +149,15 @@ function buildPresetReferenceIndex(projects: Record<string, ProjectIndexEntry>):
   return { byPreset };
 }
 
+function toEnabledPresetView(name: string, metadata: PresetDefinition | undefined) {
+  return {
+    name,
+    skills: sortStrings(new Set(metadata?.skills ?? [])),
+    source: metadata?.source ?? 'static',
+    readonly: metadata?.readonly ?? false,
+  };
+}
+
 function requireStringArray(name: string, value: unknown): string[] {
   if (!Array.isArray(value) || value.some((entry) => typeof entry !== 'string')) {
     throw new UiValidationError('usage', `${name} must be a string array.`, {
@@ -217,23 +228,23 @@ export class UiFacade {
   }
 
   async getDashboard(): Promise<DashboardView> {
-    const [{ config }, presets, projectsIndex, skills] = await Promise.all([
+    const [{ config }, presetDefinitions, projectsIndex, skills] = await Promise.all([
       loadConfig(),
-      listPresets(),
+      listPresetDefinitions(),
       loadConfig().then(({ paths }) => loadProjectsIndex(paths.projectsFile)),
       loadConfig().then(({ config: loadedConfig }) => listSkills(loadedConfig.skillsDir)),
     ]);
 
     void config;
 
-    const projects = Object.entries(projectsIndex.projects)
+    const projects = (Object.entries(projectsIndex.projects) as Array<[string, ProjectIndexEntry]>)
       .map(([projectPath, entry]) => toProjectSummary(projectPath, entry))
       .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt));
 
     return {
       totals: {
         projects: projects.length,
-        presets: Object.keys(presets).length,
+        presets: presetDefinitions.length,
         skills: skills.length,
       },
       recentProjects: projects.slice(0, 5),
@@ -340,11 +351,12 @@ export class UiFacade {
       });
     }
 
-    const presets = await listPresets();
+    const presetDefinitions = await listPresetDefinitions();
+    const presetMap = new Map(presetDefinitions.map((preset) => [preset.name, preset]));
     const presetSkillMap = new Map<string, string[]>();
 
     for (const presetName of state.enabledPresets) {
-      presetSkillMap.set(presetName, presets[presetName] ? [...presets[presetName]] : []);
+      presetSkillMap.set(presetName, presetMap.get(presetName)?.skills ? [...(presetMap.get(presetName)?.skills ?? [])] : []);
     }
 
     const directSkills = new Set(state.enabledSkills);
@@ -379,10 +391,7 @@ export class UiFacade {
       projectPath,
       targets: sortStrings(Object.keys(state.targets)) as TargetName[],
       updatedAt: state.updatedAt,
-      enabledPresets: sortStrings(state.enabledPresets).map((name) => ({
-        name,
-        skills: sortStrings(new Set(presets[name] ?? [])),
-      })),
+      enabledPresets: sortStrings(state.enabledPresets).map((name) => toEnabledPresetView(name, presetMap.get(name))),
       enabledSkills: sortStrings(new Set(state.enabledSkills)),
       resolvedSkills,
       quickActions: buildProjectQuickActions(projectPath),
@@ -395,21 +404,23 @@ export class UiFacade {
   }
 
   async getPresets(): Promise<PresetsView> {
-    const [presets, { paths }] = await Promise.all([listPresets(), loadConfig()]);
+    const [presetDefinitions, { paths }] = await Promise.all([listPresetDefinitions(), loadConfig()]);
     const projects = await loadProjectsIndex(paths.projectsFile);
     const references = buildPresetReferenceIndex(projects.projects);
 
-    const items = Object.entries(presets)
-      .sort(([left], [right]) => left.localeCompare(right))
-      .map(([name, skills]) => {
-        const uniqueSkills = sortStrings(new Set(skills));
-        const referenceProjects = references.byPreset.get(name) ?? [];
+    const items = presetDefinitions
+      .sort((left, right) => left.name.localeCompare(right.name))
+      .map((preset) => {
+        const uniqueSkills = sortStrings(new Set(preset.skills));
+        const referenceProjects = references.byPreset.get(preset.name) ?? [];
         return {
-          name,
+          name: preset.name,
           skills: uniqueSkills,
           skillCount: uniqueSkills.length,
           referenceCount: referenceProjects.length,
           referenceProjectIds: referenceProjects.map((projectPath) => encodeProjectId(projectPath)),
+          source: preset.source,
+          readonly: preset.readonly,
         };
       });
 
@@ -427,12 +438,7 @@ export class UiFacade {
       });
     }
 
-    const [presets, { paths }] = await Promise.all([listPresets(), loadConfig()]);
-    if (!presets[normalizedName]) {
-      throw new SkmError('config', `Preset ${normalizedName} was not found.`, {
-        hint: 'Load presets from `GET /api/presets` and use an existing preset name.',
-      });
-    }
+    const [preset, { paths }] = await Promise.all([getPresetDefinitionByName(normalizedName), loadConfig()]);
 
     const projectsIndex = await loadProjectsIndex(paths.projectsFile);
     const referenceProjects = Object.entries(projectsIndex.projects)
@@ -446,6 +452,8 @@ export class UiFacade {
     return {
       name: normalizedName,
       referenceCount: referenceProjects.length,
+      source: preset.source,
+      readonly: preset.readonly,
       referenceProjects,
     };
   }
@@ -540,8 +548,8 @@ export class UiFacade {
       });
     }
 
-    const existingPresets = await listPresets();
-    if (existingPresets[name]) {
+    const existingPresets = await listPresetDefinitions();
+    if (existingPresets.some((preset) => preset.name === name)) {
       throw new UiValidationError('conflict', `Preset ${name} already exists.`, {
         hint: 'Choose a different name or update the existing preset.',
         fieldErrors: {

@@ -2,17 +2,71 @@ import { loadConfig, parsePresetYaml, writePresetYaml } from '../config/service.
 import { SkmError } from '../errors.js';
 import { loadProjectsIndex } from '../project/projects-index.js';
 import { listSkills } from '../registry/skills.js';
-import type { PresetsMap } from '../types.js';
+import type { PresetDefinition, PresetsMap } from '../types.js';
 import { uniqueSorted } from '../utils/collection.js';
 import { toDisplayPath } from '../utils/path.js';
 
-export async function listPresets(): Promise<PresetsMap> {
+function toPresetMap(definitions: PresetDefinition[]): PresetsMap {
+  return Object.fromEntries(definitions.map((preset) => [preset.name, [...preset.skills]]));
+}
+
+function buildReadonlyPresetError(name: string): SkmError {
+  return new SkmError('conflict', `Preset ${name} is a dynamic scope preset and cannot be modified.`, {
+    hint: 'Rename or remove the scope directory to change it, or create a different static preset name in `presets.yaml`.',
+  });
+}
+
+export async function listStaticPresets(): Promise<PresetsMap> {
   return parsePresetYaml();
 }
 
-export async function getPresetByName(name: string): Promise<string[]> {
-  const presets = await listPresets();
-  const preset = presets[name];
+export async function listPresetDefinitions(): Promise<PresetDefinition[]> {
+  const [{ config }, staticPresets] = await Promise.all([loadConfig(), listStaticPresets()]);
+  const skills = await listSkills(config.skillsDir);
+
+  const dynamicPresets = new Map<string, string[]>();
+  for (const skill of skills) {
+    if (!skill.scopeName) {
+      continue;
+    }
+
+    const existing = dynamicPresets.get(skill.scopeName) ?? [];
+    existing.push(skill.name);
+    dynamicPresets.set(skill.scopeName, existing);
+  }
+
+  for (const name of dynamicPresets.keys()) {
+    if (staticPresets[name]) {
+      throw new SkmError('conflict', `Preset name ${name} is defined both statically and as a dynamic scope preset.`, {
+        hint: 'Rename the preset in `presets.yaml` or rename the scope directory to remove the ambiguity.',
+      });
+    }
+  }
+
+  const definitions: PresetDefinition[] = [
+    ...Object.entries(staticPresets).map(([name, skillsInPreset]) => ({
+      name,
+      skills: uniqueSorted(skillsInPreset),
+      source: 'static' as const,
+      readonly: false,
+    })),
+    ...Array.from(dynamicPresets.entries()).map(([name, skillsInPreset]) => ({
+      name,
+      skills: uniqueSorted(skillsInPreset),
+      source: 'dynamic' as const,
+      readonly: true,
+    })),
+  ];
+
+  return definitions.sort((left, right) => left.name.localeCompare(right.name));
+}
+
+export async function listPresets(): Promise<PresetsMap> {
+  return toPresetMap(await listPresetDefinitions());
+}
+
+export async function getPresetDefinitionByName(name: string): Promise<PresetDefinition> {
+  const preset = (await listPresetDefinitions()).find((entry) => entry.name === name);
 
   if (!preset) {
     throw new SkmError('config', `Preset ${name} was not found.`, {
@@ -21,6 +75,10 @@ export async function getPresetByName(name: string): Promise<string[]> {
   }
 
   return preset;
+}
+
+export async function getPresetByName(name: string): Promise<string[]> {
+  return (await getPresetDefinitionByName(name)).skills;
 }
 
 function validatePresetName(name: string): string {
@@ -53,9 +111,10 @@ export async function addPresetDefinition(input: { name: string; skills: string[
   const name = validatePresetName(input.name);
   const skills = validatePresetSkills(input.skills);
   await assertSkillsExist(skills);
-  const presets = await listPresets();
+  const presets = await listStaticPresets();
+  const presetDefinitions = await listPresetDefinitions();
 
-  if (presets[name]) {
+  if (presetDefinitions.some((preset) => preset.name === name)) {
     throw new SkmError('conflict', `Preset ${name} already exists.`, {
       hint: 'Use `skm preset update <name> <skill...>` to replace its skills.',
     });
@@ -70,7 +129,14 @@ export async function updatePresetDefinition(input: { name: string; skills: stri
   const name = validatePresetName(input.name);
   const skills = validatePresetSkills(input.skills);
   await assertSkillsExist(skills);
-  const presets = await listPresets();
+  const presets = await listStaticPresets();
+
+  if (!presets[name]) {
+    const preset = await listPresetDefinitions().then((entries) => entries.find((entry) => entry.name === name));
+    if (preset?.readonly) {
+      throw buildReadonlyPresetError(name);
+    }
+  }
 
   if (!presets[name]) {
     throw new SkmError('config', `Preset ${name} was not found.`, {
@@ -85,7 +151,14 @@ export async function updatePresetDefinition(input: { name: string; skills: stri
 
 export async function deletePresetDefinition(name: string): Promise<{ name: string }> {
   const normalized = validatePresetName(name);
-  const presets = await listPresets();
+  const presets = await listStaticPresets();
+
+  if (!presets[normalized]) {
+    const preset = await listPresetDefinitions().then((entries) => entries.find((entry) => entry.name === normalized));
+    if (preset?.readonly) {
+      throw buildReadonlyPresetError(normalized);
+    }
+  }
 
   if (!presets[normalized]) {
     throw new SkmError('config', `Preset ${normalized} was not found.`, {

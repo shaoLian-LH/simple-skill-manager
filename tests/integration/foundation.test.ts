@@ -139,12 +139,14 @@ describe('foundation CLI', () => {
       const inspect = await runCli(['preset', 'inspect', 'frontend-basic'], { env: { HOME: homeDir } });
 
       expect(JSON.parse(list.stdout)).toEqual([
-        { name: 'frontend-basic', skillCount: 2 },
-        { name: 'writing', skillCount: 1 },
+        { name: 'frontend-basic', skillCount: 2, source: 'static', readonly: false },
+        { name: 'writing', skillCount: 1, source: 'static', readonly: false },
       ]);
       expect(JSON.parse(inspect.stdout)).toEqual({
         name: 'frontend-basic',
         skills: ['brainstorming', 'test-engineer'],
+        source: 'static',
+        readonly: false,
       });
 
       await writePresetsFile(presetsFile, 'frontend-basic: [brainstorming\n');
@@ -152,6 +154,61 @@ describe('foundation CLI', () => {
       expect(failure.stderr).toContain('invalid YAML');
       expect(failure.stderr).toContain('Repair presets.yaml');
       expect(failure.code).toBe(3);
+    });
+  });
+
+  it('discovers scoped skills and exposes scope directories as dynamic presets', async () => {
+    await withTempDir('skm-home-', async (homeDir) => {
+      const skillsDir = path.join(homeDir, 'skills-registry');
+      await createSkillFixtures(skillsDir, [
+        { dirName: 'impeccable/overdrive', name: 'overdrive' },
+        { dirName: 'impeccable/polish', name: 'polish' },
+      ]);
+      await initConfigWithSkills(homeDir, skillsDir);
+
+      const skillList = await runCli(['skill', 'list'], { env: { HOME: homeDir } });
+      const presetList = await runCli(['preset', 'list'], { env: { HOME: homeDir } });
+      const presetInspect = await runCli(['preset', 'inspect', 'impeccable'], { env: { HOME: homeDir } });
+
+      expect(JSON.parse(skillList.stdout)).toEqual([
+        {
+          name: 'impeccable/overdrive',
+          path: path.join(skillsDir, 'impeccable', 'overdrive'),
+          description: '',
+        },
+        {
+          name: 'impeccable/polish',
+          path: path.join(skillsDir, 'impeccable', 'polish'),
+          description: '',
+        },
+      ]);
+      expect(JSON.parse(presetList.stdout)).toEqual(
+        expect.arrayContaining([
+          { name: 'impeccable', skillCount: 2, source: 'dynamic', readonly: true },
+        ]),
+      );
+      expect(JSON.parse(presetInspect.stdout)).toEqual({
+        name: 'impeccable',
+        skills: ['impeccable/overdrive', 'impeccable/polish'],
+        source: 'dynamic',
+        readonly: true,
+      });
+    });
+  });
+
+  it('fails when a static preset name collides with a dynamic scope preset', async () => {
+    await withTempDir('skm-home-', async (homeDir) => {
+      const skillsDir = path.join(homeDir, 'skills-registry');
+      await createSkillFixtures(skillsDir, [{ dirName: 'impeccable/overdrive', name: 'overdrive' }]);
+      await initConfigWithSkills(homeDir, skillsDir);
+      await writePresetsFile(
+        path.join(globalAppDir(homeDir), 'presets.yaml'),
+        ['impeccable:', '  - impeccable/overdrive'].join('\n'),
+      );
+
+      const failure = await runCliExpectFailure(['preset', 'list'], { env: { HOME: homeDir } });
+      expect(failure.stderr).toContain('defined both statically and as a dynamic scope preset');
+      expect(failure.code).toBe(4);
     });
   });
 });

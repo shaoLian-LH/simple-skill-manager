@@ -139,12 +139,47 @@ async function readSkillFromDir(dirPath: string): Promise<SkillDefinition | null
 
   return {
     name: name.trim(),
+    localName: name.trim(),
+    scopeName: null,
     description: normalizeDescription(parsed.data),
     dirPath,
     skillFilePath,
     frontmatter: parsed.data,
     body: parsed.content,
   };
+}
+
+function createScopedSkillDefinition(skill: SkillDefinition, scopeName: string): SkillDefinition {
+  const normalizedScope = scopeName.trim();
+  const normalizedLocalName = skill.localName.trim();
+
+  if (normalizedScope.length === 0 || normalizedLocalName.length === 0) {
+    throw new SkmError('config', `Scoped skill at ${toDisplayPath(skill.dirPath)} is missing a valid scope or name.`, {
+      hint: 'Ensure the scope directory name and skill frontmatter `name` are both non-empty.',
+    });
+  }
+
+  return {
+    ...skill,
+    name: `${normalizedScope}/${normalizedLocalName}`,
+    localName: normalizedLocalName,
+    scopeName: normalizedScope,
+  };
+}
+
+function assertUniqueSkillName(seen: Map<string, string>, skill: SkillDefinition): void {
+  const existingPath = seen.get(skill.name);
+  if (existingPath) {
+    throw new SkmError(
+      'conflict',
+      `Duplicate skill name ${skill.name} was found in ${toDisplayPath(existingPath)} and ${toDisplayPath(skill.dirPath)}.`,
+      {
+        hint: 'Rename one of the conflicting skill frontmatter names so every skill name is unique.',
+      },
+    );
+  }
+
+  seen.set(skill.name, skill.dirPath);
 }
 
 export async function listSkills(skillsDir: string): Promise<SkillDefinition[]> {
@@ -168,20 +203,39 @@ export async function listSkills(skillsDir: string): Promise<SkillDefinition[]> 
     }
 
     const dirPath = path.join(skillsDir, entry.name);
-    const skill = await readSkillFromDir(dirPath);
-    if (!skill) {
+    const directSkill = await readSkillFromDir(dirPath);
+    if (directSkill) {
+      assertUniqueSkillName(seen, directSkill);
+      skills.push(directSkill);
       continue;
     }
 
-    const existingPath = seen.get(skill.name);
-    if (existingPath) {
-      throw new SkmError('conflict', `Duplicate skill name ${skill.name} was found in ${toDisplayPath(existingPath)} and ${toDisplayPath(dirPath)}.`, {
-        hint: 'Rename one of the conflicting skill frontmatter names so every skill name is unique.',
+    let childEntries;
+    try {
+      childEntries = await fs.readdir(dirPath, { withFileTypes: true });
+    } catch (error) {
+      throw new SkmError('config', `Skill scope directory cannot be read: ${toDisplayPath(dirPath)}.`, {
+        details: error instanceof Error ? error.message : undefined,
+        hint: 'Check the configured skillsDir path and directory permissions.',
+        cause: error,
       });
     }
 
-    seen.set(skill.name, dirPath);
-    skills.push(skill);
+    for (const childEntry of childEntries) {
+      if (!childEntry.isDirectory()) {
+        continue;
+      }
+
+      const childDirPath = path.join(dirPath, childEntry.name);
+      const childSkill = await readSkillFromDir(childDirPath);
+      if (!childSkill) {
+        continue;
+      }
+
+      const scopedSkill = createScopedSkillDefinition(childSkill, entry.name);
+      assertUniqueSkillName(seen, scopedSkill);
+      skills.push(scopedSkill);
+    }
   }
 
   return skills.sort((left, right) => left.name.localeCompare(right.name));

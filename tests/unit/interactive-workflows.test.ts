@@ -87,6 +87,37 @@ describe('interactive workflows', () => {
     });
   });
 
+  it('shows dynamic scope presets in interactive inspect prompts', async () => {
+    await withTempDir('skm-home-', async (homeDir) => {
+      process.env.HOME = homeDir;
+      const skillsDir = path.join(homeDir, 'skills-registry');
+      await createSkillFixtures(skillsDir, [
+        { dirName: 'impeccable/overdrive', name: 'overdrive' },
+        { dirName: 'impeccable/polish', name: 'polish' },
+      ]);
+      await initConfigWithSkills(homeDir, skillsDir);
+
+      const promptAdapter = new FakePromptAdapter({ selectOne: ['impeccable'] });
+      vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
+
+      const exitCode = await runCli(['node', 'skm', 'preset', 'inspect'], {
+        promptAdapter,
+        isInteractiveSession: () => true,
+      });
+
+      expect(exitCode).toBe(0);
+      expect(promptAdapter.calls.selectOne[0]?.choices).toEqual(
+        expect.arrayContaining([
+          {
+            value: 'impeccable',
+            label: 'impeccable',
+            description: '2 skills: impeccable/overdrive, impeccable/polish · dynamic scope',
+          },
+        ]),
+      );
+    });
+  });
+
   it('prints Cancelled and exits with success when interactive command is aborted', async () => {
     await withTempDir('skm-home-', async (homeDir) => {
       process.env.HOME = homeDir;

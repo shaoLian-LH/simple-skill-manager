@@ -15,6 +15,7 @@
   },
   "scripts": {
     "build": "npm run build:web && tsup && node scripts/copy-ui-assets.mjs",
+    "build:cli": "tsup",
     "build:web": "vite build && node scripts/sync-ui-build.mjs",
     "dev": "tsx src/bin/skm.ts",
     "dev:web": "vite",

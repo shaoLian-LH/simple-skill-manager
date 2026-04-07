@@ -140,7 +140,7 @@ describe('v2 CLI roadmap', () => {
         await runCli(['preset', 'add', 'frontend-v2', 'brainstorming', 'test-engineer'], { env: { HOME: homeDir } });
         await runCli(['preset', 'update', 'frontend-v2', 'brainstorming'], { env: { HOME: homeDir } });
         const inspect = await runCli(['preset', 'inspect', 'frontend-v2'], { env: { HOME: homeDir } });
-        expect(JSON.parse(inspect.stdout)).toEqual({ name: 'frontend-v2', skills: ['brainstorming'] });
+        expect(JSON.parse(inspect.stdout)).toEqual({ name: 'frontend-v2', skills: ['brainstorming'], source: 'static', readonly: false });
 
         await runCli(['preset', 'enable', 'frontend-v2', '--target', '.agents'], { cwd: projectDir, env: { HOME: homeDir } });
         const deleted = await runCli(['preset', 'delete', 'frontend-v2'], { env: { HOME: homeDir } });
@@ -164,6 +164,25 @@ describe('v2 CLI roadmap', () => {
         };
         expect(finalState.enabledPresets).toEqual([]);
       });
+    });
+  });
+
+  it('rejects CRUD operations against dynamic scope presets', async () => {
+    await withTempDir('skm-home-', async (homeDir) => {
+      const skillsDir = path.join(homeDir, 'skills-registry');
+      await createSkillFixtures(skillsDir, [
+        { dirName: 'impeccable/overdrive', name: 'overdrive' },
+        { dirName: 'impeccable/polish', name: 'polish' },
+      ]);
+      await initConfigWithSkills(homeDir, skillsDir);
+
+      const updateFailure = await runCliExpectFailure(['preset', 'update', 'impeccable', 'impeccable/overdrive'], { env: { HOME: homeDir } });
+      expect(updateFailure.code).toBe(4);
+      expect(updateFailure.stderr).toContain('dynamic scope preset and cannot be modified');
+
+      const deleteFailure = await runCliExpectFailure(['preset', 'delete', 'impeccable'], { env: { HOME: homeDir } });
+      expect(deleteFailure.code).toBe(4);
+      expect(deleteFailure.stderr).toContain('dynamic scope preset and cannot be modified');
     });
   });
 });

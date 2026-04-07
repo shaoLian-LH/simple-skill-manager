@@ -74,14 +74,16 @@ describe.sequential('ui API integration', () => {
 
           const detailResponse = await requestJson<{
             projectPath: string;
-            enabledPresets: Array<{ name: string }>;
+            enabledPresets: Array<{ name: string; source: string; readonly: boolean }>;
             enabledSkills: string[];
             resolvedSkills: Array<{ name: string; direct: boolean; viaPresets: string[]; sourceLabels: string[] }>;
           }>(`${baseUrl}/api/projects/${encodeURIComponent(project!.projectId)}`);
           expect(detailResponse.status).toBe(200);
           expect(detailResponse.body.ok).toBe(true);
           expect(detailResponse.body.data.projectPath).toBe(await fs.realpath(projectDir));
-          expect(detailResponse.body.data.enabledPresets.map((preset) => preset.name)).toEqual(['frontend-v1']);
+          expect(detailResponse.body.data.enabledPresets).toEqual([
+            expect.objectContaining({ name: 'frontend-v1', source: 'static', readonly: false }),
+          ]);
           expect(detailResponse.body.data.enabledSkills).toEqual(['brainstorming']);
           expect(detailResponse.body.data.resolvedSkills).toEqual(
             expect.arrayContaining([
@@ -98,7 +100,10 @@ describe.sequential('ui API integration', () => {
           expect(malformedProjectResponse.body.ok).toBe(false);
           expect(malformedProjectResponse.body.error).toMatchObject({ kind: 'usage' });
 
-          const presetsResponse = await requestJson<{ items: Array<{ name: string }>; quickActions: Array<{ id: string; command: string }> }>(
+          const presetsResponse = await requestJson<{
+            items: Array<{ name: string; source: string; readonly: boolean }>;
+            quickActions: Array<{ id: string; command: string }>;
+          }>(
             `${baseUrl}/api/presets`,
           );
           expect(presetsResponse.status).toBe(200);
@@ -108,6 +113,11 @@ describe.sequential('ui API integration', () => {
             id: expect.any(String),
             command: expect.any(String),
           });
+          expect(presetsResponse.body.data.items).toEqual(
+            expect.arrayContaining([
+              expect.objectContaining({ name: 'frontend-v1', source: 'static', readonly: false }),
+            ]),
+          );
 
           const configResponse = await requestJson<{
             skillsDir: string;
@@ -213,6 +223,8 @@ describe.sequential('ui API integration', () => {
           const previewResponse = await requestJson<{
             name: string;
             referenceCount: number;
+            source: string;
+            readonly: boolean;
             referenceProjects: Array<{ projectId: string; projectPath: string }>;
           }>(`${baseUrl}/api/presets/frontend-v1/delete-preview`);
 
@@ -220,6 +232,8 @@ describe.sequential('ui API integration', () => {
           expect(previewResponse.body.ok).toBe(true);
           expect(previewResponse.body.data.name).toBe('frontend-v1');
           expect(previewResponse.body.data.referenceCount).toBe(1);
+          expect(previewResponse.body.data.source).toBe('static');
+          expect(previewResponse.body.data.readonly).toBe(false);
           expect(previewResponse.body.data.referenceProjects).toHaveLength(1);
           expect(previewResponse.body.data.referenceProjects[0]).toMatchObject({
             projectId: expect.any(String),
@@ -274,6 +288,78 @@ describe.sequential('ui API integration', () => {
           expect(malformedBody.error).toMatchObject({
             kind: 'usage',
             message: 'Request body must be valid JSON.',
+          });
+        } finally {
+          await server.stop();
+        }
+      });
+    });
+  });
+
+  it('exposes dynamic preset metadata and blocks delete for readonly presets', async () => {
+    await withTempDir('skm-home-', async (homeDir) => {
+      await withTempDir('skm-project-', async (projectDir) => {
+        const skillsDir = path.join(homeDir, 'skills-registry');
+        await createSkillFixtures(skillsDir, [
+          { dirName: 'impeccable/overdrive', name: 'overdrive' },
+          { dirName: 'impeccable/polish', name: 'polish' },
+        ]);
+        await initConfigWithSkills(homeDir, skillsDir);
+        await runCli(['preset', 'enable', 'impeccable', '--target', '.agents'], { cwd: projectDir, env: { HOME: homeDir } });
+
+        process.env.HOME = homeDir;
+        const server = await startUiServer({ preferredPort: 0 });
+        try {
+          const baseUrl = server.launchStatus.url;
+          const projects = await requestJson<Array<{ projectId: string }>>(`${baseUrl}/api/projects`);
+          const projectId = projects.body.data[0]?.projectId;
+
+          const presetsResponse = await requestJson<{
+            items: Array<{ name: string; source: string; readonly: boolean; skills: string[] }>;
+          }>(`${baseUrl}/api/presets`);
+          expect(presetsResponse.status).toBe(200);
+          expect(presetsResponse.body.data.items).toEqual(
+            expect.arrayContaining([
+              expect.objectContaining({
+                name: 'impeccable',
+                source: 'dynamic',
+                readonly: true,
+                skills: ['impeccable/overdrive', 'impeccable/polish'],
+              }),
+            ]),
+          );
+
+          const detailResponse = await requestJson<{
+            enabledPresets: Array<{ name: string; source: string; readonly: boolean; skills: string[] }>;
+          }>(`${baseUrl}/api/projects/${encodeURIComponent(projectId ?? '')}`);
+          expect(detailResponse.status).toBe(200);
+          expect(detailResponse.body.data.enabledPresets).toEqual([
+            expect.objectContaining({
+              name: 'impeccable',
+              source: 'dynamic',
+              readonly: true,
+              skills: ['impeccable/overdrive', 'impeccable/polish'],
+            }),
+          ]);
+
+          const previewResponse = await requestJson<{ name: string; source: string; readonly: boolean }>(
+            `${baseUrl}/api/presets/impeccable/delete-preview`,
+          );
+          expect(previewResponse.status).toBe(200);
+          expect(previewResponse.body.data).toMatchObject({
+            name: 'impeccable',
+            source: 'dynamic',
+            readonly: true,
+          });
+
+          const deleteResponse = await requestJson<unknown>(`${baseUrl}/api/presets/impeccable`, {
+            method: 'DELETE',
+          });
+          expect(deleteResponse.status).toBe(409);
+          expect(deleteResponse.body.ok).toBe(false);
+          expect(deleteResponse.body.error).toMatchObject({
+            kind: 'conflict',
+            message: expect.stringContaining('dynamic scope preset and cannot be modified'),
           });
         } finally {
           await server.stop();

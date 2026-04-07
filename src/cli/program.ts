@@ -11,9 +11,18 @@ import {
 import { loadConfig, initGlobalConfig, setSkillsDir } from '../core/config/service.js';
 import { ExitCode, SkmError, formatError } from '../core/errors.js';
 import { renderJson, renderMessage } from '../core/output/render.js';
-import { findPresetReferences, getPresetByName, listPresets, addPresetDefinition, deletePresetDefinition, updatePresetDefinition } from '../core/registry/presets.js';
+import {
+  addPresetDefinition,
+  deletePresetDefinition,
+  findPresetReferences,
+  getPresetByName,
+  listPresetDefinitions,
+  listStaticPresets,
+  updatePresetDefinition,
+} from '../core/registry/presets.js';
 import { getSkillByName, listSkills, toSkillInspectView } from '../core/registry/skills.js';
 import { loadProjectState } from '../core/state/project-state.js';
+import type { PresetDefinition } from '../core/types.js';
 import { toDisplayPath } from '../core/utils/path.js';
 import { runUiCommand, type UiCommandRuntime } from '../ui/server/runtime.js';
 import { PromptCancelledError, type PromptAdapter, type PromptChoice, TtyPromptAdapter } from './interactive/adapter.js';
@@ -76,13 +85,13 @@ function formatPresetChoiceDescription(skills: string[]): string {
   return `${skillLabel}: ${skills.join(', ')}`;
 }
 
-function createPresetChoices(presets: Record<string, string[]>): PromptChoice[] {
-  return Object.entries(presets)
-    .sort(([left], [right]) => left.localeCompare(right))
-    .map(([name, skills]) => ({
-      value: name,
-      label: name,
-      description: formatPresetChoiceDescription(skills),
+function createPresetChoices(presets: PresetDefinition[]): PromptChoice[] {
+  return presets
+    .sort((left, right) => left.name.localeCompare(right.name))
+    .map((preset) => ({
+      value: preset.name,
+      label: preset.name,
+      description: `${formatPresetChoiceDescription(preset.skills)}${preset.readonly ? ' · dynamic scope' : ''}`,
     }));
 }
 
@@ -263,12 +272,15 @@ function createProgram(deps: CliDependencies = {}): Command {
     .command('list')
     .description('List all configured presets.')
     .action(async () => {
-      const presets = await listPresets();
+      const presets = await listPresetDefinitions();
       printStdout(
         renderJson(
-          Object.entries(presets)
-            .sort(([left], [right]) => left.localeCompare(right))
-            .map(([name, skills]) => ({ name, skillCount: skills.length })),
+          presets.map((preset) => ({
+            name: preset.name,
+            skillCount: preset.skills.length,
+            source: preset.source,
+            readonly: preset.readonly,
+          })),
         ),
       );
     });
@@ -277,8 +289,8 @@ function createProgram(deps: CliDependencies = {}): Command {
     .command('inspect [name]')
     .description('Expand and print the skills in a preset.')
     .action(async (name: string | undefined) => {
-      const presets = await listPresets();
-      if (!name && Object.keys(presets).length === 0) {
+      const presets = await listPresetDefinitions();
+      if (!name && presets.length === 0) {
         printStdout(renderMessage('No presets are available to inspect.'));
         return;
       }
@@ -291,7 +303,8 @@ function createProgram(deps: CliDependencies = {}): Command {
         'Run `skm preset inspect <name>`.',
       );
       const skills = await getPresetByName(collected.value);
-      printStdout(renderJson({ name: collected.value, skills }));
+      const preset = presets.find((entry) => entry.name === collected.value);
+      printStdout(renderJson({ name: collected.value, skills, source: preset?.source ?? 'static', readonly: preset?.readonly ?? false }));
     });
 
   presetCommand
@@ -299,7 +312,7 @@ function createProgram(deps: CliDependencies = {}): Command {
     .description('Enable one or more presets in the current project and install their skills into selected targets.')
     .option('-t, --target <target>', 'Target root to install into. Repeat to install into multiple targets.', collectTargetsOption, [])
     .action(async (names: string[] | undefined, options: { target: string[] }) => {
-      const presets = await listPresets();
+      const presets = await listPresetDefinitions();
       const selectedPresets = await collectMany(
         { canPrompt: canPrompt(), prompt },
         names,
@@ -381,7 +394,7 @@ function createProgram(deps: CliDependencies = {}): Command {
         return;
       }
 
-      const existingPresets = await listPresets();
+      const existingPresets = await listPresetDefinitions();
       let usedPrompt = false;
 
       let presetName = name?.trim() ?? '';
@@ -393,7 +406,7 @@ function createProgram(deps: CliDependencies = {}): Command {
           if (candidate.length === 0) {
             continue;
           }
-          if (existingPresets[candidate]) {
+          if (existingPresets.some((preset) => preset.name === candidate)) {
             printStdout(renderMessage(`Preset ${candidate} already exists.`));
             continue;
           }
@@ -435,8 +448,14 @@ function createProgram(deps: CliDependencies = {}): Command {
         return;
       }
 
-      const presets = await listPresets();
-      if (!name && Object.keys(presets).length === 0) {
+      const presets = await listStaticPresets();
+      const presetDefinitions = Object.entries(presets).map(([presetName, presetSkills]) => ({
+        name: presetName,
+        skills: presetSkills,
+        source: 'static' as const,
+        readonly: false,
+      }));
+      if (!name && presetDefinitions.length === 0) {
         printStdout(renderMessage('No presets are available to update.'));
         return;
       }
@@ -445,7 +464,7 @@ function createProgram(deps: CliDependencies = {}): Command {
       const collectedName = await collectSingle(
         promptContext,
         name,
-        createPresetChoices(presets),
+        createPresetChoices(presetDefinitions),
         'Select a preset to update',
         'Preset name is required in non-interactive mode.',
         'Run `skm preset update <name> <skill...>`.',
@@ -480,15 +499,21 @@ function createProgram(deps: CliDependencies = {}): Command {
     .description('Delete a preset definition from global presets.yaml.')
     .action(async (name: string | undefined) => {
       const promptContext = { canPrompt: canPrompt(), prompt };
-      const presets = await listPresets();
-      if (!name && Object.keys(presets).length === 0) {
+      const presets = await listStaticPresets();
+      const presetDefinitions = Object.entries(presets).map(([presetName, presetSkills]) => ({
+        name: presetName,
+        skills: presetSkills,
+        source: 'static' as const,
+        readonly: false,
+      }));
+      if (!name && presetDefinitions.length === 0) {
         printStdout(renderMessage('No presets are available to delete.'));
         return;
       }
       const collected = await collectSingle(
         promptContext,
         name,
-        createPresetChoices(presets),
+        createPresetChoices(presetDefinitions),
         'Select a preset to delete',
         'Preset name is required in non-interactive mode.',
         'Run `skm preset delete <name>`.',

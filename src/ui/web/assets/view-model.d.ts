@@ -20,6 +20,8 @@ export interface QuickAction {
 export interface PresetDeletePreview {
   name: string;
   referenceCount: number;
+  source?: 'static' | 'dynamic';
+  readonly?: boolean;
   referenceProjects: Array<{
     projectId: string;
     projectPath: string;

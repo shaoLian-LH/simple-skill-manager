@@ -34,6 +34,27 @@ interface PendingInstallChange {
   backup?: PendingBackup;
 }
 
+async function removeEmptyAncestorDirectories(startPath: string, stopPath: string): Promise<void> {
+  let currentPath = path.dirname(startPath);
+  const normalizedStopPath = path.resolve(stopPath);
+
+  while (currentPath.startsWith(normalizedStopPath) && currentPath !== normalizedStopPath) {
+    let entries: string[];
+    try {
+      entries = await fs.readdir(currentPath);
+    } catch {
+      break;
+    }
+
+    if (entries.length > 0) {
+      break;
+    }
+
+    await fs.rmdir(currentPath).catch(() => undefined);
+    currentPath = path.dirname(currentPath);
+  }
+}
+
 function getSymlinkType(): 'junction' | 'dir' {
   return process.platform === 'win32' ? 'junction' : 'dir';
 }
@@ -225,4 +246,5 @@ export async function removeManagedInstall(projectPath: string, target: TargetNa
   if (await pathExists(installPath)) {
     await removePath(installPath);
   }
+  await removeEmptyAncestorDirectories(installPath, path.join(projectPath, target, 'skills'));
 }

@@ -52,6 +52,8 @@ export interface DashboardView {
 export interface EnabledPresetView {
   name: string;
   skills: string[];
+  source: 'static' | 'dynamic';
+  readonly: boolean;
 }
 
 export interface ResolvedSkillView {
@@ -78,6 +80,8 @@ export interface PresetView {
   skillCount: number;
   referenceCount: number;
   referenceProjectIds: string[];
+  source: 'static' | 'dynamic';
+  readonly: boolean;
 }
 
 export interface PresetsView {
@@ -88,6 +92,8 @@ export interface PresetsView {
 export interface PresetDeletePreviewView {
   name: string;
   referenceCount: number;
+  source: 'static' | 'dynamic';
+  readonly: boolean;
   referenceProjects: Array<{
     projectId: string;
     projectPath: string;

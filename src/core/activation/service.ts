@@ -393,6 +393,40 @@ function indexEntryEquals(left: ProjectIndexEntry | undefined, right: ProjectInd
 
 async function detectUnexpectedTargetEntries(projectPath: string, state: ProjectState): Promise<DoctorIssue[]> {
   const issues: DoctorIssue[] = [];
+  const fsModule = await import('node:fs/promises');
+
+  async function walkUnexpectedEntries(
+    target: TargetName,
+    targetSkillsDir: string,
+    currentDir: string,
+    expectedSkillNames: Set<string>,
+  ): Promise<void> {
+    const entries = await fsModule.default.readdir(currentDir, { withFileTypes: true });
+
+    for (const entry of entries) {
+      const entryPath = path.join(currentDir, entry.name);
+      const relativePath = path.relative(targetSkillsDir, entryPath).split(path.sep).join('/');
+      const exactMatch = expectedSkillNames.has(relativePath);
+      const hasManagedDescendant = [...expectedSkillNames].some((skillName) => skillName.startsWith(`${relativePath}/`));
+
+      if (exactMatch) {
+        continue;
+      }
+
+      if (entry.isDirectory() && hasManagedDescendant) {
+        await walkUnexpectedEntries(target, targetSkillsDir, entryPath, expectedSkillNames);
+        continue;
+      }
+
+      issues.push({
+        type: 'unexpected-target-entry',
+        target,
+        skillName: relativePath,
+        path: entryPath,
+        message: `Unexpected entry exists at ${entryPath}.`,
+      });
+    }
+  }
 
   for (const target of getExistingTargets(state)) {
     const skillsDir = path.join(projectPath, target, 'skills');
@@ -400,18 +434,7 @@ async function detectUnexpectedTargetEntries(projectPath: string, state: Project
       continue;
     }
 
-    const entries = await (await import('node:fs/promises')).default.readdir(skillsDir, { withFileTypes: true });
-    for (const entry of entries) {
-      if (!state.targets[target]?.skills[entry.name]) {
-        issues.push({
-          type: 'unexpected-target-entry',
-          target,
-          skillName: entry.name,
-          path: path.join(skillsDir, entry.name),
-          message: `Unexpected entry exists at ${path.join(skillsDir, entry.name)}.`,
-        });
-      }
-    }
+    await walkUnexpectedEntries(target, skillsDir, skillsDir, new Set(Object.keys(state.targets[target]?.skills ?? {})));
   }
 
   return issues;

@@ -3,6 +3,8 @@ export type TargetName = (typeof SUPPORTED_TARGETS)[number];
 
 export const INSTALL_MODES = ['symlink', 'copy'] as const;
 export type InstallMode = (typeof INSTALL_MODES)[number];
+export const PRESET_SOURCES = ['static', 'dynamic'] as const;
+export type PresetSource = (typeof PRESET_SOURCES)[number];
 
 export type ErrorKind = 'usage' | 'config' | 'conflict' | 'runtime';
 
@@ -14,6 +16,8 @@ export interface Config {
 
 export interface SkillDefinition {
   name: string;
+  localName: string;
+  scopeName: string | null;
   description: string;
   dirPath: string;
   skillFilePath: string;
@@ -22,6 +26,13 @@ export interface SkillDefinition {
 }
 
 export type PresetsMap = Record<string, string[]>;
+
+export interface PresetDefinition {
+  name: string;
+  skills: string[];
+  source: PresetSource;
+  readonly: boolean;
+}
 
 export interface InstalledSkillRecord {
   sourcePath: string;
