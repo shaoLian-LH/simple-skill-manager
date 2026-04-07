@@ -10,6 +10,7 @@ import {
   createDefaultProjectsIndex,
 } from '../constants.js';
 import { SkmError } from '../errors.js';
+import { assertSupportedTargets } from '../install/targets.js';
 import type { Config, ProjectsIndex } from '../types.js';
 import { ensureDir, pathExists, readJsonFile, writeJsonFileAtomic, writeTextFileAtomic, writeTextFileIfMissing } from '../utils/fs.js';
 import { resolveUserPath, toDisplayPath } from '../utils/path.js';
@@ -100,6 +101,50 @@ export async function setSkillsDir(inputPath: string): Promise<Config> {
     ...config,
     skillsDir: resolvedPath,
   };
+
+  await writeJsonFileAtomic(paths.configFile, nextConfig);
+  return nextConfig;
+}
+
+export interface UpdateConfigRequest {
+  skillsDir?: string;
+  defaultTargets?: string[];
+}
+
+export async function updateConfig(request: UpdateConfigRequest): Promise<Config> {
+  const { config, paths } = await loadConfig();
+  const nextConfig: Config = { ...config };
+
+  if (request.skillsDir !== undefined) {
+    const resolvedPath = resolveUserPath(request.skillsDir);
+    let stat;
+    try {
+      stat = await fs.stat(resolvedPath);
+    } catch {
+      throw new SkmError('config', `Skills directory does not exist: ${toDisplayPath(resolvedPath)}.`, {
+        hint: 'Create the directory first, then update `skillsDir` again.',
+      });
+    }
+
+    if (!stat.isDirectory()) {
+      throw new SkmError('config', `Skills directory is not a directory: ${toDisplayPath(resolvedPath)}.`, {
+        hint: 'Choose an existing directory for `skillsDir`.',
+      });
+    }
+
+    nextConfig.skillsDir = resolvedPath;
+  }
+
+  if (request.defaultTargets !== undefined) {
+    assertSupportedTargets(request.defaultTargets);
+    nextConfig.defaultTargets = [...new Set(request.defaultTargets)];
+  }
+
+  if (request.skillsDir === undefined && request.defaultTargets === undefined) {
+    throw new SkmError('usage', 'At least one config field is required.', {
+      hint: 'Provide `skillsDir` and/or `defaultTargets`.',
+    });
+  }
 
   await writeJsonFileAtomic(paths.configFile, nextConfig);
   return nextConfig;

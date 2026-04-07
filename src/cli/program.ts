@@ -15,6 +15,7 @@ import { findPresetReferences, getPresetByName, listPresets, addPresetDefinition
 import { getSkillByName, listSkills, toSkillInspectView } from '../core/registry/skills.js';
 import { loadProjectState } from '../core/state/project-state.js';
 import { toDisplayPath } from '../core/utils/path.js';
+import { runUiCommand, type UiCommandRuntime } from '../ui/server/runtime.js';
 import { PromptCancelledError, type PromptAdapter, type PromptChoice, TtyPromptAdapter } from './interactive/adapter.js';
 import { collectMany, collectSingle, collectTargets, ensurePromptable } from './interactive/collector.js';
 
@@ -41,6 +42,17 @@ function stableUnique(values: string[]): string[] {
     next.push(value);
   }
   return next;
+}
+
+function parsePortOption(value: string): number {
+  const parsed = Number.parseInt(value, 10);
+  if (!Number.isInteger(parsed) || parsed < 1 || parsed > 65535) {
+    throw new SkmError('usage', `Invalid port: ${value}.`, {
+      hint: 'Provide a port between 1 and 65535.',
+    });
+  }
+
+  return parsed;
 }
 
 function createNamedChoices(values: string[]): PromptChoice[] {
@@ -82,12 +94,14 @@ async function withLoadedConfig<T>(callback: (skillsDir: string) => Promise<T>):
 export interface CliDependencies {
   promptAdapter?: PromptAdapter;
   isInteractiveSession?: () => boolean;
+  uiRuntime?: UiCommandRuntime;
 }
 
 function createProgram(deps: CliDependencies = {}): Command {
   const program = new Command();
   const prompt = deps.promptAdapter ?? new TtyPromptAdapter();
   const canPrompt = deps.isInteractiveSession ?? (() => Boolean(process.stdin.isTTY && process.stdout.isTTY));
+  const uiRuntime = deps.uiRuntime ?? { run: runUiCommand };
 
   program
     .name('skm')
@@ -519,6 +533,20 @@ function createProgram(deps: CliDependencies = {}): Command {
     .action(async () => {
       const issues = await doctorProject(process.cwd());
       printStdout(renderJson({ ok: issues.length === 0, issues }));
+    });
+
+  program
+    .command('ui')
+    .description('Start the local Web UI server.')
+    .option('--port <port>', 'Preferred local port for the Web UI server.', parsePortOption)
+    .option('--no-open', 'Do not auto-open the browser after startup.')
+    .action(async (options: { port?: number; open?: boolean }) => {
+      await uiRuntime.run({
+        port: options.port,
+        noOpen: options.open === false,
+        stdout: printStdout,
+        stderr: printStderr,
+      });
     });
 
   return program;
