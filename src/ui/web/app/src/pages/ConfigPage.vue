@@ -17,7 +17,6 @@ interface ConfigBaseline {
   supportedTargets: string[];
   paths: ConfigStoragePaths | null;
   folderPickerSupported: boolean;
-  chooseFolderEndpoint: string | null;
 }
 
 const setQuickActions = useSetQuickActions();
@@ -71,17 +70,8 @@ function normalizeConfig(value: unknown): ConfigBaseline {
       }
     : null;
 
-  const capabilities = asRecord(root.capabilities);
   const folderPicker = asRecord(root.folderPicker);
-  const folderPickerSupported =
-    (typeof capabilities?.folderPicker === 'boolean' && capabilities.folderPicker) ||
-    (typeof folderPicker?.supported === 'boolean' && folderPicker.supported) ||
-    false;
-
-  const chooseFolderEndpointRaw =
-    asString(capabilities?.chooseFolderEndpoint) ||
-    asString(folderPicker?.endpoint) ||
-    asString(root.chooseFolderEndpoint);
+  const folderPickerSupported = typeof folderPicker?.supported === 'boolean' && folderPicker.supported;
 
   return {
     skillsDir,
@@ -89,7 +79,6 @@ function normalizeConfig(value: unknown): ConfigBaseline {
     supportedTargets: supportedTargets.length > 0 ? supportedTargets : defaultTargets,
     paths,
     folderPickerSupported,
-    chooseFolderEndpoint: chooseFolderEndpointRaw.length > 0 ? chooseFolderEndpointRaw : null,
   };
 }
 
@@ -222,7 +211,7 @@ async function copySkillsDir(): Promise<void> {
 
 function extractPathFromPickerResponse(value: unknown): string {
   const record = asRecord(value) ?? {};
-  const candidate = asString(record.path) || asString(record.selectedPath) || asString(record.skillsDir);
+  const candidate = asString(record.path);
   return candidate.trim();
 }
 
@@ -240,36 +229,33 @@ async function chooseFolder(): Promise<void> {
 
   isPickingFolder.value = true;
 
-  const endpointCandidates = uniqueStrings(
-    [activeBaseline.chooseFolderEndpoint, '/api/config/choose-folder', '/api/config/skills-dir/choose'].filter(
-      (entry): entry is string => typeof entry === 'string' && entry.length > 0,
-    ),
-  );
+  try {
+    const payload = await apiRequest<{ path: string | null; canceled: boolean }>('/api/config/skills-dir/pick', {
+      method: 'POST',
+      body: JSON.stringify({}),
+    });
 
-  let pickedPath = '';
-  for (const endpoint of endpointCandidates) {
-    try {
-      const payload = await apiRequest<unknown>(endpoint, {
-        method: 'POST',
-        body: JSON.stringify({}),
-      });
-      pickedPath = extractPathFromPickerResponse(payload);
-      if (pickedPath.length > 0) {
-        break;
-      }
-    } catch {
-      continue;
+    if (payload.canceled) {
+      return;
     }
-  }
 
-  if (pickedPath.length > 0) {
-    draftSkillsDir.value = pickedPath;
-    successMessage.value = t('config.folderSelected');
-  } else {
+    const pickedPath = extractPathFromPickerResponse(payload);
+    if (pickedPath.length > 0) {
+      draftSkillsDir.value = pickedPath;
+      successMessage.value = t('config.folderSelected');
+      return;
+    }
+
     pageError.value = t('config.folderPickerHostUnavailable');
+  } catch (error) {
+    if (error instanceof ApiRequestError) {
+      pageError.value = error.detail.message;
+    } else {
+      pageError.value = t('config.folderPickerHostUnavailable');
+    }
+  } finally {
+    isPickingFolder.value = false;
   }
-
-  isPickingFolder.value = false;
 }
 
 onMounted(() => {
@@ -332,7 +318,7 @@ onMounted(() => {
             <button
               type="button"
               class="btn-secondary"
-              :disabled="isPickingFolder || isSaving"
+              :disabled="isPickingFolder || isSaving || !baseline?.folderPickerSupported"
               @click="chooseFolder"
             >
               {{ isPickingFolder ? t('common.choosingFolder') : t('config.chooseFolder') }}

@@ -13,15 +13,16 @@ import {
   listPresetDefinitions,
   updatePresetDefinition,
 } from '../../core/registry/presets.js';
-import { listSkills } from '../../core/registry/skills.js';
+import { getSkillByName, listSkills } from '../../core/registry/skills.js';
 import { loadGlobalState } from '../../core/state/global-state.js';
 import { loadProjectState } from '../../core/state/project-state.js';
-import { SUPPORTED_TARGETS, type PresetDefinition, type ProjectIndexEntry, type TargetName } from '../../core/types.js';
+import { SUPPORTED_TARGETS, type PresetDefinition, type ProjectIndexEntry, type SkillDefinition, type TargetName } from '../../core/types.js';
 import type {
   BootView,
   ConfigView,
   DashboardView,
   EnabledPresetView,
+  FolderPickView,
   LaunchStatusView,
   MatchedProjectView,
   OverviewView,
@@ -43,7 +44,8 @@ import type {
   SkillsView,
 } from '../contracts/api.js';
 import { UiValidationError } from '../server/errors.js';
-import { quickOpenProjectPath } from '../system/quick-open.js';
+import { isNativeFolderPickerSupported, pickSkillsDirectory as pickNativeSkillsDirectory, type FolderPickView as FolderPickResult } from '../system/folder-picker.js';
+import { quickOpenPath as quickOpenSystemPath } from '../system/quick-open.js';
 import { DEFAULT_UI_LOCALE, translateUiText, type UiLocale } from '../text.js';
 import { decodeProjectId, encodeProjectId } from './project-id.js';
 
@@ -58,6 +60,8 @@ interface MatchedProjectRecord {
 
 export interface UiFacadeDependencies {
   openProjectPath?: (projectPath: string, locale?: UiLocale) => Promise<QuickOpenView>;
+  pickFolderPath?: (locale?: UiLocale) => Promise<FolderPickResult>;
+  isFolderPickerAvailable?: () => boolean;
 }
 
 function t(locale: UiLocale, key: string, params?: Record<string, string | number>): string {
@@ -80,6 +84,24 @@ function createProjectReference(projectPath: string): ProjectReferenceView {
     projectPath,
     displayName: getProjectDisplayName(projectPath),
   };
+}
+
+function normalizeDisplayPath(targetPath: string, segmentCount = 2): string {
+  const normalized = targetPath.replace(/\\/g, '/').replace(/\/+$/, '');
+  const segments = normalized.split('/').filter(Boolean);
+  if (segments.length === 0) {
+    return targetPath;
+  }
+
+  return segments.slice(-Math.max(segmentCount, 1)).join('/');
+}
+
+function toSkillLocationKind(skill: SkillDefinition): 'direct' | 'dynamic-preset' {
+  return skill.scopeName ? 'dynamic-preset' : 'direct';
+}
+
+function getSkillOpenPath(skill: SkillDefinition): string {
+  return skill.scopeName ? path.dirname(path.dirname(skill.dirPath)) : path.dirname(skill.dirPath);
 }
 
 function toProjectSummary(projectPath: string, entry: ProjectIndexEntry): ProjectSummaryView {
@@ -216,6 +238,7 @@ function requireStringArray(name: string, value: unknown, locale: UiLocale = DEF
 function toConfigView(
   config: Awaited<ReturnType<typeof updateConfig>> | Awaited<ReturnType<typeof loadConfig>>['config'],
   paths: Awaited<ReturnType<typeof loadConfig>>['paths'],
+  folderPickerSupported: boolean,
   locale: UiLocale = DEFAULT_UI_LOCALE,
 ): ConfigView {
   return {
@@ -229,9 +252,8 @@ function toConfigView(
       projectsFile: paths.projectsFile,
     },
     folderPicker: {
-      supported: false,
-      mode: 'manual-only',
-      reason: t(locale, 'facade.folderPickerReason'),
+      supported: folderPickerSupported,
+      mode: folderPickerSupported ? 'host' : 'manual-only',
     },
   };
 }
@@ -411,11 +433,17 @@ function buildRelationshipSummaryItems(input: {
 
 export class UiFacade {
   private readonly openProjectPath: (projectPath: string, locale?: UiLocale) => Promise<QuickOpenView>;
+  private readonly pickFolderPath: (locale?: UiLocale) => Promise<FolderPickResult>;
+  private readonly isFolderPickerAvailable: () => boolean;
 
   constructor(deps: UiFacadeDependencies = {}) {
     this.openProjectPath =
       deps.openProjectPath ??
-      ((projectPath, locale) => quickOpenProjectPath(projectPath, undefined, locale));
+      ((projectPath, locale) => quickOpenSystemPath(projectPath, undefined, locale));
+    this.pickFolderPath =
+      deps.pickFolderPath ??
+      ((locale = DEFAULT_UI_LOCALE) => pickNativeSkillsDirectory({ locale }));
+    this.isFolderPickerAvailable = deps.isFolderPickerAvailable ?? (() => isNativeFolderPickerSupported());
   }
 
   async getDashboard(locale: UiLocale = DEFAULT_UI_LOCALE): Promise<DashboardView> {
@@ -537,7 +565,7 @@ export class UiFacade {
 
   async getConfig(locale: UiLocale = DEFAULT_UI_LOCALE): Promise<ConfigView> {
     const { config, paths } = await loadConfig();
-    return toConfigView(config, paths, locale);
+    return toConfigView(config, paths, this.isFolderPickerAvailable(), locale);
   }
 
   async updateConfig(payload: unknown, locale: UiLocale = DEFAULT_UI_LOCALE): Promise<ConfigView> {
@@ -577,7 +605,17 @@ export class UiFacade {
     }
 
     const { paths } = await loadConfig();
-    return toConfigView(nextConfig, paths, locale);
+    return toConfigView(nextConfig, paths, this.isFolderPickerAvailable(), locale);
+  }
+
+  async pickSkillsDirectory(locale: UiLocale = DEFAULT_UI_LOCALE): Promise<FolderPickView> {
+    if (!this.isFolderPickerAvailable()) {
+      throw new UiValidationError('usage', t(locale, 'config.folderPickerUnavailable'), {
+        hint: t(locale, 'config.pickerUnavailableHint'),
+      });
+    }
+
+    return this.pickFolderPath(locale);
   }
 
   async getProjects(): Promise<ProjectSummaryView[]> {
@@ -719,6 +757,25 @@ export class UiFacade {
     return this.openProjectPath(projectPath, locale);
   }
 
+  async quickOpenProjectParent(projectId: string, locale: UiLocale = DEFAULT_UI_LOCALE): Promise<QuickOpenView> {
+    const projectPath = await this.resolveProjectPath(projectId, locale);
+    const parentPath = path.dirname(projectPath);
+    return this.openProjectPath(parentPath, locale);
+  }
+
+  async quickOpenSkill(skillName: string, locale: UiLocale = DEFAULT_UI_LOCALE): Promise<QuickOpenView> {
+    const normalizedName = skillName.trim();
+    if (normalizedName.length === 0) {
+      throw new UiValidationError('usage', t(locale, 'server.upstream.skillNameRequired'), {
+        hint: t(locale, 'server.upstream.skillNameRequiredHint'),
+      });
+    }
+
+    const { config } = await loadConfig();
+    const skill = await getSkillByName(config.skillsDir, normalizedName);
+    return this.openProjectPath(getSkillOpenPath(skill), locale);
+  }
+
   async quickOpenPath(targetPath: string, locale: UiLocale = DEFAULT_UI_LOCALE): Promise<QuickOpenView> {
     return this.openProjectPath(targetPath, locale);
   }
@@ -822,12 +879,12 @@ export class UiFacade {
   }
 
   async getSkills(): Promise<SkillsView> {
-    const [skills, projectsIndex, presetDefinitions, globalState] = await Promise.all([
-      loadConfig().then(({ config }) => listSkills(config.skillsDir)),
-      loadConfig().then(({ paths }) => loadProjectsIndex(paths.projectsFile)),
+    const [{ config, paths }, presetDefinitions, globalState] = await Promise.all([
+      loadConfig(),
       listPresetDefinitions(),
-      loadConfig().then(({ paths }) => loadGlobalState(paths)),
+      loadConfig().then(({ paths: loadedPaths }) => loadGlobalState(loadedPaths)),
     ]);
+    const [skills, projectsIndex] = await Promise.all([listSkills(config.skillsDir), loadProjectsIndex(paths.projectsFile)]);
 
     const presetMap = new Map(presetDefinitions.map((preset) => [preset.name, new Set(preset.skills)]));
     const globalEnabledSkills = new Set(globalState?.enabledSkills ?? []);
@@ -858,6 +915,10 @@ export class UiFacade {
           name: skill.name,
           description: skill.description,
           path: skill.dirPath,
+          displayPath: normalizeDisplayPath(skill.dirPath),
+          fullPath: skill.dirPath,
+          openPath: getSkillOpenPath(skill),
+          locationKind: toSkillLocationKind(skill),
           globalEnabled: globalEnabledSkills.has(skill.name),
           updatedAt: await getSkillUpdatedAt(skill.skillFilePath),
           directProjects: directProjects.sort((left, right) => left.displayName.localeCompare(right.displayName)),
@@ -881,7 +942,7 @@ export class UiFacade {
     await enableSkills({
       scope: 'global',
       skillNames: requireStringArray('skillNames', body.skillNames, locale),
-      targets: body.targets === undefined ? [] : requireStringArray('targets', body.targets, locale),
+      targets: body.targets === undefined ? undefined : requireStringArray('targets', body.targets, locale),
     });
 
     return this.getSkills();

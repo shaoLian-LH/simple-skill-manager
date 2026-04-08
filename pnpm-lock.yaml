@@ -20,6 +20,9 @@ importers:
       gray-matter:
         specifier: ^4.0.3
         version: 4.0.3
+      macos-open-file-dialog:
+        specifier: ^1.0.1
+        version: 1.0.1
       motion:
         specifier: ^12.23.24
         version: 12.38.0
@@ -945,6 +948,9 @@ packages:
 
   loupe@3.2.1:
     resolution: {integrity: sha512-CdzqowRJCeLU72bHvWqwRBBlLcMEtIvGrlvef74kMnV2AolS9Y8xUv1I0U/MNAWMhBlKIoyuEgoJ0t/bbwHbLQ==}
+
+  macos-open-file-dialog@1.0.1:
+    resolution: {integrity: sha512-kW75GcIOVaUWGy0e4pwanRdFmOJOBvOOw56h3Q4JR5gUlq2UN+5NEiONjPMbZzkbb/D5vwyuA0Uc6SObBm6vPg==}
 
   magic-string@0.30.21:
     resolution: {integrity: sha512-vd2F4YUyEXKGcLHoq+TEyCjxueSeHnFxyyjNp80yg0XV4vUhnDer/lvvlqM/arB5bXQN5K2/3oinyCRyx8T2CQ==}
@@ -2096,6 +2102,8 @@ snapshots:
   load-tsconfig@0.2.5: {}
 
   loupe@3.2.1: {}
+
+  macos-open-file-dialog@1.0.1: {}
 
   magic-string@0.30.21:
     dependencies:

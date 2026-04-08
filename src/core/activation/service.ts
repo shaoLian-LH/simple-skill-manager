@@ -57,7 +57,7 @@ export interface EnableSkillsRequest {
   scope?: ActivationScope;
   projectPath?: string;
   skillNames: string[];
-  targets: string[];
+  targets?: string[];
 }
 
 export interface DisableSkillsRequest {
@@ -70,7 +70,7 @@ export interface EnablePresetsRequest {
   scope?: ActivationScope;
   projectPath?: string;
   presetNames: string[];
-  targets: string[];
+  targets?: string[];
 }
 
 export interface DisablePresetsRequest {
@@ -147,18 +147,27 @@ function getManagedSkillNames(state: ActivationState): string[] {
 }
 
 function resolveActiveTargets(
-  requestedTargets: string[],
+  requestedTargets: string[] | undefined,
   scope: ActivationScope,
   config: Config,
   state: ActivationState,
 ): TargetName[] {
+  const existingTargets = getExistingTargets(state);
+
+  if (requestedTargets === undefined) {
+    if (existingTargets.length > 0) {
+      return uniqueSorted(existingTargets) as TargetName[];
+    }
+
+    return uniqueSorted(config.defaultTargets) as TargetName[];
+  }
+
   assertSupportedTargets(requestedTargets);
 
   if (requestedTargets.length > 0) {
-    return uniqueSorted([...getExistingTargets(state), ...requestedTargets]) as TargetName[];
+    return uniqueSorted([...existingTargets, ...requestedTargets]) as TargetName[];
   }
 
-  const existingTargets = getExistingTargets(state);
   if (existingTargets.length > 0) {
     return uniqueSorted(existingTargets) as TargetName[];
   }
@@ -256,7 +265,7 @@ function assertEnableTargets(scope: ActivationScope, activeTargets: TargetName[]
 
   if (scope === 'global') {
     throw new SkmError('usage', 'At least one target is required for global enable operations.', {
-      hint: 'Pass `--target <target>` or first establish global targets through an interactive selection.',
+      hint: 'Pass `--target <target>` or configure `defaultTargets` in `config.json`.',
     });
   }
 

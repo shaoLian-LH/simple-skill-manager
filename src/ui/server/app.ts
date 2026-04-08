@@ -100,6 +100,11 @@ export function createUiRequestHandler(options: UiRequestHandlerOptions): (reque
         return;
       }
 
+      if (method === 'POST' && pathname === '/api/config/skills-dir/pick') {
+        sendJson(response, 200, ok(await options.facade.pickSkillsDirectory(locale)));
+        return;
+      }
+
       if (method === 'GET' && pathname === '/api/projects') {
         sendJson(response, 200, ok(await options.facade.getProjects()));
         return;
@@ -207,6 +212,20 @@ export function createUiRequestHandler(options: UiRequestHandlerOptions): (reque
       if (method === 'POST' && projectQuickOpenMatch) {
         const projectId = decodeURIComponent(projectQuickOpenMatch[1] ?? '');
         sendJson(response, 200, ok(await options.facade.quickOpenProject(projectId, locale)));
+        return;
+      }
+
+      const projectParentQuickOpenMatch = pathname.match(/^\/api\/projects\/([^/]+)\/parent-quick-open$/);
+      if (method === 'POST' && projectParentQuickOpenMatch) {
+        const projectId = decodeURIComponent(projectParentQuickOpenMatch[1] ?? '');
+        sendJson(response, 200, ok(await options.facade.quickOpenProjectParent(projectId, locale)));
+        return;
+      }
+
+      const skillQuickOpenMatch = pathname.match(/^\/api\/skills\/([^/]+)\/quick-open$/);
+      if (method === 'POST' && skillQuickOpenMatch) {
+        const skillName = decodeURIComponent(skillQuickOpenMatch[1] ?? '');
+        sendJson(response, 200, ok(await options.facade.quickOpenSkill(skillName, locale)));
         return;
       }
 

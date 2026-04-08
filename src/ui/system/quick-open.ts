@@ -43,13 +43,13 @@ async function openWithDefaultSystemHandler(projectPath: string, runner: RunSyst
   await runner('xdg-open', [projectPath]);
 }
 
-export async function quickOpenProjectPath(
-  projectPath: string,
+export async function quickOpenPath(
+  targetPath: string,
   runner: RunSystemCommand = runSystemCommand,
   locale: UiLocale = DEFAULT_UI_LOCALE,
 ): Promise<QuickOpenView> {
   try {
-    await runner('code', [projectPath]);
+    await runner('code', [targetPath]);
     return {
       success: true,
       strategy: 'code',
@@ -57,7 +57,7 @@ export async function quickOpenProjectPath(
     };
   } catch (codeError) {
     try {
-      await openWithDefaultSystemHandler(projectPath, runner);
+      await openWithDefaultSystemHandler(targetPath, runner);
       return {
         success: true,
         strategy: 'default',
@@ -74,4 +74,12 @@ export async function quickOpenProjectPath(
       };
     }
   }
+}
+
+export async function quickOpenProjectPath(
+  projectPath: string,
+  runner: RunSystemCommand = runSystemCommand,
+  locale: UiLocale = DEFAULT_UI_LOCALE,
+): Promise<QuickOpenView> {
+  return quickOpenPath(projectPath, runner, locale);
 }

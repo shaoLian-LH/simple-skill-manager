@@ -75,6 +75,11 @@ export interface RelationshipSummaryView {
   items: RelationshipSummaryItemView[];
 }
 
+export interface FolderPickView {
+  path: string | null;
+  canceled: boolean;
+}
+
 export interface OverviewView {
   launchCwd: string;
   matchedProject: MatchedProjectView | null;
@@ -173,6 +178,10 @@ export interface SkillItemView {
   name: string;
   description: string;
   path: string;
+  displayPath: string;
+  fullPath: string;
+  openPath: string;
+  locationKind: 'direct' | 'dynamic-preset';
   globalEnabled: boolean;
   updatedAt?: string;
   directProjects: SkillIntersectionProjectView[];
@@ -224,7 +233,6 @@ export interface ConfigView {
   folderPicker: {
     supported: boolean;
     mode: 'host' | 'manual-only';
-    reason?: string;
   };
 }
 

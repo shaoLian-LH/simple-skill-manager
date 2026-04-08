@@ -1,8 +1,25 @@
 import { describe, expect, it } from 'vitest';
 
-import { quickOpenProjectPath } from '../../src/ui/system/quick-open.js';
+import { quickOpenPath, quickOpenProjectPath } from '../../src/ui/system/quick-open.js';
 
 describe('quick open project path', () => {
+  it('opens arbitrary directories through the shared quick-open helper', async () => {
+    const calls: Array<{ command: string; args: string[] }> = [];
+    const result = await quickOpenPath('/tmp/skills', async (command, args) => {
+      calls.push({ command, args });
+      if (command !== 'code') {
+        throw new Error('unexpected fallback');
+      }
+    });
+
+    expect(calls).toEqual([{ command: 'code', args: ['/tmp/skills'] }]);
+    expect(result).toEqual({
+      success: true,
+      strategy: 'code',
+      message: '已在 VS Code 中打开项目。',
+    });
+  });
+
   it('uses code strategy when code command succeeds', async () => {
     const calls: Array<{ command: string; args: string[] }> = [];
     const result = await quickOpenProjectPath('/tmp/project', async (command, args) => {

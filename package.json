@@ -30,18 +30,19 @@
     "prepublishOnly": "pnpm run publish:verify"
   },
   "dependencies": {
-    "animate.css": "^4.1.1",
     "@inquirer/prompts": "^7.10.1",
+    "animate.css": "^4.1.1",
     "commander": "^14.0.1",
     "gray-matter": "^4.0.3",
+    "macos-open-file-dialog": "^1.0.1",
     "motion": "^12.23.24",
     "vue": "^3.5.22",
     "vue-router": "^4.6.3",
     "yaml": "^2.8.1"
   },
   "devDependencies": {
-    "@vitejs/plugin-vue": "^6.0.1",
     "@types/node": "^24.6.0",
+    "@vitejs/plugin-vue": "^6.0.1",
     "@vue/compiler-sfc": "^3.5.22",
     "autoprefixer": "^10.4.21",
     "postcss": "^8.5.6",

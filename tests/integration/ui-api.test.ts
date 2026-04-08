@@ -7,6 +7,9 @@ import { createSkillFixtures } from '../helpers/fixtures.js';
 import { runCli } from '../helpers/cli.js';
 import { initConfigWithSkills } from '../helpers/skm-env.js';
 import { withTempDir } from '../helpers/temp.js';
+import { UiFacade } from '../../src/ui/facade/service.js';
+import { loadConfig } from '../../src/core/config/service.js';
+import { loadGlobalState } from '../../src/core/state/global-state.js';
 import { startUiServer } from '../../src/ui/server/server.js';
 
 interface ApiEnvelope<T> {
@@ -39,6 +42,7 @@ describe.sequential('ui API integration', () => {
         await createSkillFixtures(skillsDir, [
           { dirName: 'brainstorming', name: 'brainstorming' },
           { dirName: 'test-engineer', name: 'test-engineer' },
+          { dirName: 'impeccable/overdrive', name: 'overdrive' },
         ]);
         await initConfigWithSkills(homeDir, skillsDir);
         await runCli(['preset', 'create', 'frontend-v1', 'brainstorming', 'test-engineer'], { env: { HOME: homeDir } });
@@ -123,6 +127,7 @@ describe.sequential('ui API integration', () => {
             skillsDir: string;
             supportedTargets: string[];
             quickActions: Array<{ id: string; command: string }>;
+            folderPicker: { supported: boolean; mode: string };
           }>(`${baseUrl}/api/config`);
           expect(configResponse.status).toBe(200);
           expect(configResponse.body.ok).toBe(true);
@@ -134,6 +139,52 @@ describe.sequential('ui API integration', () => {
             id: expect.any(String),
             command: expect.any(String),
           });
+          expect(configResponse.body.data.folderPicker).toMatchObject({
+            supported: expect.any(Boolean),
+            mode: expect.stringMatching(/host|manual-only/),
+          });
+          expect(configResponse.body.data).not.toHaveProperty('chooseFolderEndpoint');
+          expect(configResponse.body.data.folderPicker).not.toHaveProperty('endpoint');
+
+          const skillsResponse = await requestJson<{
+            items: Array<{
+              name: string;
+              displayPath: string;
+              fullPath: string;
+              openPath: string;
+              locationKind: 'direct' | 'dynamic-preset';
+              globalEnabled: boolean;
+              directProjects: Array<{ projectId: string; projectPath: string }>;
+              viaPresetProjects: Array<{ projectId: string; projectPath: string; viaPresetNames?: string[] }>;
+            }>;
+          }>(`${baseUrl}/api/skills`);
+          expect(skillsResponse.status).toBe(200);
+          expect(skillsResponse.body.ok).toBe(true);
+          expect(skillsResponse.body.data.items).toEqual(
+            expect.arrayContaining([
+              expect.objectContaining({
+                name: 'brainstorming',
+                displayPath: 'skills-registry/brainstorming',
+                fullPath: path.join(skillsDir, 'brainstorming'),
+                openPath: skillsDir,
+                locationKind: 'direct',
+                globalEnabled: false,
+                directProjects: expect.arrayContaining([
+                  expect.objectContaining({
+                    projectId: expect.any(String),
+                    projectPath: await fs.realpath(projectDir),
+                  }),
+                ]),
+              }),
+              expect.objectContaining({
+                name: 'impeccable/overdrive',
+                displayPath: 'impeccable/overdrive',
+                fullPath: path.join(skillsDir, 'impeccable', 'overdrive'),
+                openPath: skillsDir,
+                locationKind: 'dynamic-preset',
+              }),
+            ]),
+          );
         } finally {
           await server.stop();
         }
@@ -189,6 +240,28 @@ describe.sequential('ui API integration', () => {
           expect(configResponse.status).toBe(200);
           expect(configResponse.body.data.defaultTargets).toEqual(['.agents', '.trae']);
 
+          const enableGlobalSkillResponse = await requestJson<{ items: Array<{ name: string; globalEnabled: boolean }> }>(
+            `${baseUrl}/api/skills/global/enable`,
+            {
+              method: 'POST',
+              headers: {
+                'content-type': 'application/json',
+              },
+              body: JSON.stringify({ skillNames: ['brainstorming'] }),
+            },
+          );
+          expect(enableGlobalSkillResponse.status).toBe(200);
+          expect(enableGlobalSkillResponse.body.data.items).toEqual(
+            expect.arrayContaining([expect.objectContaining({ name: 'brainstorming', globalEnabled: true })]),
+          );
+
+          const { paths } = await loadConfig();
+          const globalState = await loadGlobalState(paths);
+          expect(globalState?.targets).toMatchObject({
+            '.agents': expect.any(Object),
+            '.trae': expect.any(Object),
+          });
+
           const deletePresetResponse = await requestJson<{
             deleted: { name: string; referenceCount: number };
             presets: { items: Array<{ name: string }> };
@@ -205,6 +278,64 @@ describe.sequential('ui API integration', () => {
           await server.stop();
         }
       });
+    });
+  });
+
+  it('opens derived skill locations through the dedicated skill quick-open endpoint', async () => {
+    await withTempDir('skm-home-', async (homeDir) => {
+      const skillsDir = path.join(homeDir, 'skills-registry');
+      await createSkillFixtures(skillsDir, [
+        { dirName: 'brainstorming', name: 'brainstorming' },
+        { dirName: 'impeccable/overdrive', name: 'overdrive' },
+      ]);
+      await initConfigWithSkills(homeDir, skillsDir);
+
+      const openedPaths: string[] = [];
+      const facade = new UiFacade({
+        openProjectPath: async (targetPath) => {
+          openedPaths.push(targetPath);
+          return {
+            success: true,
+            strategy: 'code',
+            message: `Opened ${targetPath}.`,
+          };
+        },
+      });
+
+      process.env.HOME = homeDir;
+      const server = await startUiServer({ preferredPort: 0, facade });
+      try {
+        const baseUrl = server.launchStatus.url;
+
+        const directResponse = await requestJson<{ success: boolean; strategy: string | null; message: string }>(
+          `${baseUrl}/api/skills/${encodeURIComponent('brainstorming')}/quick-open`,
+          {
+            method: 'POST',
+            headers: {
+              'content-type': 'application/json',
+            },
+            body: JSON.stringify({}),
+          },
+        );
+        expect(directResponse.status).toBe(200);
+        expect(directResponse.body.ok).toBe(true);
+
+        const scopedResponse = await requestJson<{ success: boolean; strategy: string | null; message: string }>(
+          `${baseUrl}/api/skills/${encodeURIComponent('impeccable/overdrive')}/quick-open`,
+          {
+            method: 'POST',
+            headers: {
+              'content-type': 'application/json',
+            },
+            body: JSON.stringify({}),
+          },
+        );
+        expect(scopedResponse.status).toBe(200);
+        expect(scopedResponse.body.ok).toBe(true);
+        expect(openedPaths).toEqual([skillsDir, skillsDir]);
+      } finally {
+        await server.stop();
+      }
     });
   });
 

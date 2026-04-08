@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, provide, ref, watch } from 'vue';
+import { computed, nextTick, onBeforeUnmount, onMounted, provide, ref, watch } from 'vue';
 import { RouterLink, RouterView, useRoute, useRouter } from 'vue-router';
 
 import { ApiRequestError, apiRequest } from './lib/api';
@@ -17,6 +17,7 @@ const launchStatus = ref<LaunchStatusView | null>(null);
 const workspaceSpine = ref<WorkspaceSpineView | null>(null);
 const quickActions = ref<QuickActionView[]>([]);
 const pendingQuickActionIds = ref<Set<string>>(new Set());
+const navDrawerOpen = ref(false);
 const toast = ref('');
 
 provide(bootViewKey, bootView);
@@ -69,17 +70,29 @@ function shortenPath(input: string): string {
   if (segments.length <= 2) {
     return normalized || input;
   }
+
   return `${segments.at(-2)}/${segments.at(-1)}`;
 }
 
 const shortLaunchPath = computed(() => {
   const launchCwd = bootView.value?.launchCwd ?? '';
-  if (!launchCwd) return t('common.unknown');
+  if (!launchCwd) {
+    return t('common.unknown');
+  }
+
   return shortenPath(launchCwd) || launchCwd;
 });
 
 const hasHeaderOperators = computed(() => quickActions.value.length > 0);
 const showUnmatchedDirectory = computed(() => bootView.value !== null && !bootView.value.matchedProjectId);
+
+function closeNavigationDrawer(): void {
+  navDrawerOpen.value = false;
+}
+
+function toggleNavigationDrawer(): void {
+  navDrawerOpen.value = !navDrawerOpen.value;
+}
 
 function setQuickActionPending(actionId: string, nextValue: boolean): void {
   const next = new Set(pendingQuickActionIds.value);
@@ -123,6 +136,12 @@ async function refreshLaunchStatus(): Promise<void> {
     launchStatus.value = await apiRequest<LaunchStatusView>('/api/launch-status');
   } catch {
     launchStatus.value = null;
+  }
+}
+
+function handleWindowKeydown(event: KeyboardEvent): void {
+  if (event.key === 'Escape') {
+    closeNavigationDrawer();
   }
 }
 
@@ -172,21 +191,36 @@ async function runQuickAction(action: QuickActionView): Promise<void> {
 }
 
 onMounted(async () => {
+  window.addEventListener('keydown', handleWindowKeydown);
   await refreshBootContext();
   if (!launchStatus.value) {
     await refreshLaunchStatus();
   }
 });
 
+onBeforeUnmount(() => {
+  window.removeEventListener('keydown', handleWindowKeydown);
+  document.body.style.overflow = '';
+});
+
 watch(
   () => route.fullPath,
   async () => {
+    closeNavigationDrawer();
     quickActions.value = [];
     pendingQuickActionIds.value = new Set();
     await nextTick();
     if (stageRef.value) {
       animateRouteSwap(stageRef.value);
     }
+  },
+  { immediate: true },
+);
+
+watch(
+  () => navDrawerOpen.value,
+  (isOpen) => {
+    document.body.style.overflow = isOpen ? 'hidden' : '';
   },
   { immediate: true },
 );
@@ -203,6 +237,55 @@ watch(
 
 <template>
   <div class="app-bg min-h-screen">
+    <button
+      type="button"
+      class="mobile-nav-trigger"
+      :class="{ 'mobile-nav-trigger--drawer-open': navDrawerOpen }"
+      :aria-expanded="navDrawerOpen"
+      aria-controls="mobile-navigation-drawer"
+      :aria-label="navDrawerOpen ? t('app.closeNavigation') : t('app.openNavigation')"
+      @click="toggleNavigationDrawer"
+    >
+      <span class="mobile-nav-trigger__line" :class="{ 'mobile-nav-trigger__line--top-open': navDrawerOpen }" />
+      <span class="mobile-nav-trigger__line" :class="{ 'mobile-nav-trigger__line--hidden': navDrawerOpen }" />
+      <span class="mobile-nav-trigger__line" :class="{ 'mobile-nav-trigger__line--bottom-open': navDrawerOpen }" />
+    </button>
+
+    <div
+      class="nav-drawer-overlay"
+      :class="{ 'nav-drawer-overlay--open': navDrawerOpen }"
+      :aria-hidden="!navDrawerOpen"
+      @click="closeNavigationDrawer"
+    />
+
+    <aside
+      id="mobile-navigation-drawer"
+      class="workbench-shell nav-drawer"
+      :class="{ 'nav-drawer--open': navDrawerOpen }"
+      :aria-hidden="!navDrawerOpen"
+    >
+      <div class="space-y-6 nav-drawer__content" :class="{ 'nav-drawer__content--with-trigger': navDrawerOpen }">
+        <div>
+          <p class="brand-tag">{{ t('app.brandTag') }}</p>
+          <h1 class="brand-title">simple-skill-manager</h1>
+          <p class="brand-note">{{ t('app.brandNote') }}</p>
+        </div>
+
+        <nav class="space-y-2 text-sm">
+          <RouterLink
+            v-for="item in navigationItems"
+            :key="`drawer-${item.to}`"
+            :to="withLocalePath(item.to)"
+            class="nav-link"
+            :class="{ active: activeNavKey === item.navKey }"
+            @click="closeNavigationDrawer"
+          >
+            {{ t(item.labelKey) }}
+          </RouterLink>
+        </nav>
+      </div>
+    </aside>
+
     <div class="app-layout">
       <aside class="workbench-shell nav-shell">
         <div class="space-y-6">
