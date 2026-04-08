@@ -379,7 +379,7 @@ describe.sequential('ui API integration', () => {
           expect(deleteResponse.body.ok).toBe(false);
           expect(deleteResponse.body.error).toMatchObject({
             kind: 'conflict',
-            message: '预设 impeccable 是动态作用域预设，无法修改。',
+            message: '技能集 impeccable 是动态作用域技能集，无法修改。',
           });
 
           const deleteEnglishResponse = await requestJson<unknown>(`${baseUrl}/api/presets/impeccable`, {

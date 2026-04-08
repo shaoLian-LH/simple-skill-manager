@@ -4,7 +4,7 @@
 
 它不会执行技能。它负责管理：
 - 全局技能目录
-- 预设定义
+- 技能集定义
 - 项目本地的 `.skm/state.json`
 - 全局的 `~/.simple-skill-manager/global-state.json`
 - 通过符号链接安装目标内容，并在失败时回退为复制
@@ -93,25 +93,25 @@ skm config get
 
 | 命令 | 作用 | 示例 / 说明 |
 | --- | --- | --- |
-| `skm preset list` | 列出所有已配置的预设。 | `skm preset list` |
-| `skm preset inspect [name]` | 显示某个预设展开后的技能列表。 | `skm preset inspect frontend-basic` |
-| `skm preset enable [names...] --target <target>` | 在当前项目中启用一个或多个预设。 | `skm preset enable frontend-basic --target .agents` |
-| `skm preset enable [names...] --global --target <target>` | 在全局范围启用一个或多个预设。 | `skm preset enable frontend-basic --global --target .gemini` |
-| `skm preset disable [names...]` | 在当前项目中禁用一个或多个预设。 | `skm preset disable frontend-basic` |
-| `skm preset disable [names...] --global` | 在全局范围禁用一个或多个预设。 | `skm preset disable frontend-basic --global` |
-| `skm preset create [name] [skills...]` | 创建一个包含非空技能列表的预设。 | `skm preset create frontend-basic brainstorming test-engineer` |
-| `skm preset update [name] [skills...]` | 用新的完整技能列表替换已有预设。 | `skm preset update frontend-basic brainstorming` |
-| `skm preset delete [name]` | 从全局 `presets.yaml` 中删除一个预设。 | `skm preset delete frontend-basic` |
+| `skm preset list` | 列出所有已配置的技能集。 | `skm preset list` |
+| `skm preset inspect [name]` | 显示某个技能集展开后的技能列表。 | `skm preset inspect frontend-basic` |
+| `skm preset enable [names...] --target <target>` | 在当前项目中启用一个或多个技能集。 | `skm preset enable frontend-basic --target .agents` |
+| `skm preset enable [names...] --global --target <target>` | 在全局范围启用一个或多个技能集。 | `skm preset enable frontend-basic --global --target .gemini` |
+| `skm preset disable [names...]` | 在当前项目中禁用一个或多个技能集。 | `skm preset disable frontend-basic` |
+| `skm preset disable [names...] --global` | 在全局范围禁用一个或多个技能集。 | `skm preset disable frontend-basic --global` |
+| `skm preset create [name] [skills...]` | 创建一个包含非空技能列表的技能集。 | `skm preset create frontend-basic brainstorming test-engineer` |
+| `skm preset update [name] [skills...]` | 用新的完整技能列表替换已有技能集。 | `skm preset update frontend-basic brainstorming` |
+| `skm preset delete [name]` | 从全局 `presets.yaml` 中删除一个技能集。 | `skm preset delete frontend-basic` |
 
 补充说明：
-- 预设保存在 `~/.simple-skill-manager/presets.yaml`
-- 每个预设的结构都是 `preset-name -> [skill-name, ...]`
-- `skm preset enable ...` 会把预设名展开为 `presets.yaml` 中定义的技能名列表
-- `skm preset delete ...` 在预设仍被项目状态引用时会给出警告
-- 一级作用域目录也会自动暴露为动态只读预设。例如：`skillsDir/impeccable/*/SKILL.md` 会产生一个名为 `impeccable` 的动态预设
-- 动态预设会展开成类似 `impeccable/overdrive` 这样的带作用域技能名
-- 动态预设可以通过 `preset list` / `preset inspect` 发现，但 `preset create/update/delete` 只作用于 `presets.yaml` 中的静态预设
-- 如果静态预设名和动态作用域预设名冲突，`skm` 会立刻报错并终止
+- 技能集保存在 `~/.simple-skill-manager/presets.yaml`
+- 每个技能集的结构都是 `preset-name -> [skill-name, ...]`
+- `skm preset enable ...` 会把技能集名展开为 `presets.yaml` 中定义的技能名列表
+- `skm preset delete ...` 在技能集仍被项目状态引用时会给出警告
+- 一级作用域目录也会自动暴露为动态只读技能集。例如：`skillsDir/impeccable/*/SKILL.md` 会产生一个名为 `impeccable` 的动态技能集
+- 动态技能集会展开成类似 `impeccable/overdrive` 这样的带作用域技能名
+- 动态技能集可以通过 `preset list` / `preset inspect` 发现，但 `preset create/update/delete` 只作用于 `presets.yaml` 中的静态技能集
+- 如果静态技能集名和动态作用域技能集名冲突，`skm` 会立刻报错并终止
 
 `presets.yaml` 示例：
 
@@ -135,15 +135,15 @@ design-review:
 | --- | --- | --- |
 | `skm sync` | 校准已安装的目标目录内容，使其与 `.skm/state.json` 保持一致。 | 修复缺失文件或目标漂移后运行。 |
 | `skm sync --global` | 校准已安装的目标目录内容，使其与 `global-state.json` 保持一致。 | 修复全局作用域的缺失文件或目标漂移后运行。 |
-| `skm doctor` | 检查项目漂移、源文件缺失、过期索引、损坏链接以及缺失的预设定义。 | `skm doctor` |
-| `skm doctor --global` | 检查全局漂移、源文件缺失、损坏链接以及缺失的预设定义。 | `skm doctor --global` |
+| `skm doctor` | 检查项目漂移、源文件缺失、过期索引、损坏链接以及缺失的技能集定义。 | `skm doctor` |
+| `skm doctor --global` | 检查全局漂移、源文件缺失、损坏链接以及缺失的技能集定义。 | `skm doctor --global` |
 
 ## 状态文件与目录
 
 | 路径 | 作用 |
 | --- | --- |
 | `~/.simple-skill-manager/config.json` | 全局配置，包含 `skillsDir` 和 `defaultTargets` |
-| `~/.simple-skill-manager/presets.yaml` | 全局预设定义 |
+| `~/.simple-skill-manager/presets.yaml` | 全局技能集定义 |
 | `~/.simple-skill-manager/projects.json` | 已知项目状态的镜像索引 |
 | `~/.simple-skill-manager/global-state.json` | 全局激活状态的权威来源 |
 | `.skm/state.json` | 项目本地状态的权威来源 |
@@ -189,7 +189,7 @@ Gemini 命令的安装位置：
 | 全局配置缺失 | 运行 `skm config init` |
 | `skillsDir` 缺失或无效 | 使用一个真实存在的目录重新执行 `skm config set skills-dir <path>` |
 | 存在重复的技能名 | 修复 `SKILL.md` frontmatter 中冲突的 `name` 字段 |
-| `presets.yaml` 非法 | 修复 `~/.simple-skill-manager/presets.yaml`，确保每个预设都映射到字符串数组 |
+| `presets.yaml` 非法 | 修复 `~/.simple-skill-manager/presets.yaml`，确保每个技能集都映射到字符串数组 |
 | 某个目标路径已被无关文件或目录占用 | 删除 `<target>/skills/<skill-name>` 处的冲突项，然后重新运行 `skm sync` |
 
 ## 开发

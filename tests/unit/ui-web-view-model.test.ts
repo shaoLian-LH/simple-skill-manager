@@ -101,7 +101,7 @@ describe('ui web view model helpers', () => {
       referenceCount: 0,
       referenceProjects: [],
     });
-    expect(noRefMessage).toContain('确认删除预设 frontend-v1 吗？');
+    expect(noRefMessage).toContain('确认删除技能集 frontend-v1 吗？');
 
     const withRefMessage = buildPresetDeleteConfirmationMessage({
       name: 'frontend-v1',
@@ -111,10 +111,10 @@ describe('ui web view model helpers', () => {
         { projectId: 'p_b', projectPath: '/tmp/b' },
       ],
     });
-    expect(withRefMessage).toContain('预设 frontend-v1 当前影响 2 个项目。');
+    expect(withRefMessage).toContain('技能集 frontend-v1 当前影响 2 个项目。');
     expect(withRefMessage).toContain('/tmp/a');
     expect(withRefMessage).toContain('/tmp/b');
-    expect(withRefMessage).toContain('确认删除预设 frontend-v1 吗？');
+    expect(withRefMessage).toContain('确认删除技能集 frontend-v1 吗？');
 
     const englishMessage = buildPresetDeleteConfirmationMessage(
       {
