@@ -30,7 +30,7 @@ describe('v2 CLI roadmap', () => {
         ]);
         await initConfigWithSkills(homeDir, skillsDir);
 
-        await runCli(['preset', 'add', 'frontend-v2', 'brainstorming', 'test-engineer'], { env: { HOME: homeDir } });
+        await runCli(['preset', 'create', 'frontend-v2', 'brainstorming', 'test-engineer'], { env: { HOME: homeDir } });
         await runCli(['skill', 'enable', 'brainstorming', 'code-review-process', '--target', '.agents'], {
           cwd: projectDir,
           env: { HOME: homeDir },
@@ -66,9 +66,9 @@ describe('v2 CLI roadmap', () => {
       expect(inspectFailure.code).toBe(2);
       expect(inspectFailure.stderr).toContain('Skill name is required in non-interactive mode');
 
-      const addFailure = await runCliExpectFailure(['preset', 'add'], { env: { HOME: homeDir } });
-      expect(addFailure.code).toBe(2);
-      expect(addFailure.stderr).toContain('Preset name is required in non-interactive mode');
+      const createFailure = await runCliExpectFailure(['preset', 'create'], { env: { HOME: homeDir } });
+      expect(createFailure.code).toBe(2);
+      expect(createFailure.stderr).toContain('Preset name is required in non-interactive mode');
     });
   });
 
@@ -102,25 +102,25 @@ describe('v2 CLI roadmap', () => {
       const skillEnable = await runCli(['skill', 'enable'], { env: { HOME: homeDir } });
       expect(skillEnable.stdout).toContain('No skills are available to enable.');
 
-      const presetAdd = await runCli(['preset', 'add', 'frontend-v2'], { env: { HOME: homeDir } });
-      expect(presetAdd.stdout).toContain('No skills are available to create a preset.');
+      const presetCreate = await runCli(['preset', 'create', 'frontend-v2'], { env: { HOME: homeDir } });
+      expect(presetCreate.stdout).toContain('No skills are available to create a preset.');
 
       const presetUpdate = await runCli(['preset', 'update', 'frontend-v2'], { env: { HOME: homeDir } });
       expect(presetUpdate.stdout).toContain('No skills are available to update preset definitions.');
     });
   });
 
-  it('rejects preset add/update when parameter-mode skill names do not exist', async () => {
+  it('rejects preset create/update when parameter-mode skill names do not exist', async () => {
     await withTempDir('skm-home-', async (homeDir) => {
       const skillsDir = path.join(homeDir, 'skills-registry');
       await createSkillFixtures(skillsDir, [{ dirName: 'brainstorming', name: 'brainstorming' }]);
       await initConfigWithSkills(homeDir, skillsDir);
 
-      const addFailure = await runCliExpectFailure(['preset', 'add', 'frontend-v2', 'missing-skill'], { env: { HOME: homeDir } });
-      expect(addFailure.code).toBe(3);
-      expect(addFailure.stderr).toContain('Preset references unknown skill(s): missing-skill.');
+      const createFailure = await runCliExpectFailure(['preset', 'create', 'frontend-v2', 'missing-skill'], { env: { HOME: homeDir } });
+      expect(createFailure.code).toBe(3);
+      expect(createFailure.stderr).toContain('Preset references unknown skill(s): missing-skill.');
 
-      await runCli(['preset', 'add', 'frontend-v2', 'brainstorming'], { env: { HOME: homeDir } });
+      await runCli(['preset', 'create', 'frontend-v2', 'brainstorming'], { env: { HOME: homeDir } });
       const updateFailure = await runCliExpectFailure(['preset', 'update', 'frontend-v2', 'missing-skill'], { env: { HOME: homeDir } });
       expect(updateFailure.code).toBe(3);
       expect(updateFailure.stderr).toContain('Preset references unknown skill(s): missing-skill.');
@@ -137,7 +137,7 @@ describe('v2 CLI roadmap', () => {
         ]);
         await initConfigWithSkills(homeDir, skillsDir);
 
-        await runCli(['preset', 'add', 'frontend-v2', 'brainstorming', 'test-engineer'], { env: { HOME: homeDir } });
+        await runCli(['preset', 'create', 'frontend-v2', 'brainstorming', 'test-engineer'], { env: { HOME: homeDir } });
         await runCli(['preset', 'update', 'frontend-v2', 'brainstorming'], { env: { HOME: homeDir } });
         const inspect = await runCli(['preset', 'inspect', 'frontend-v2'], { env: { HOME: homeDir } });
         expect(JSON.parse(inspect.stdout)).toEqual({ name: 'frontend-v2', skills: ['brainstorming'], source: 'static', readonly: false });
@@ -183,6 +183,16 @@ describe('v2 CLI roadmap', () => {
       const deleteFailure = await runCliExpectFailure(['preset', 'delete', 'impeccable'], { env: { HOME: homeDir } });
       expect(deleteFailure.code).toBe(4);
       expect(deleteFailure.stderr).toContain('dynamic scope preset and cannot be modified');
+    });
+  });
+
+  it('rejects removed preset add command', async () => {
+    await withTempDir('skm-home-', async (homeDir) => {
+      const failure = await runCliExpectFailure(['preset', 'add', 'frontend-v2', 'brainstorming'], {
+        env: { HOME: homeDir },
+      });
+      expect(failure.code).toBe(2);
+      expect(failure.stderr).toContain('unknown command');
     });
   });
 });

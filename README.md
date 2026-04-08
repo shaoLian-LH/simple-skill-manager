@@ -91,7 +91,7 @@ Quick notes:
 | `skm preset enable [names...] --global --target <target>` | Enable one or more presets in global scope. | `skm preset enable frontend-basic --global --target .gemini` |
 | `skm preset disable [names...]` | Disable one or more presets in the current project. | `skm preset disable frontend-basic` |
 | `skm preset disable [names...] --global` | Disable one or more presets in global scope. | `skm preset disable frontend-basic --global` |
-| `skm preset add [name] [skills...]` | Create a preset with a non-empty skill list. | `skm preset add frontend-basic brainstorming test-engineer` |
+| `skm preset create [name] [skills...]` | Create a preset with a non-empty skill list. | `skm preset create frontend-basic brainstorming test-engineer` |
 | `skm preset update [name] [skills...]` | Replace the full skill list for an existing preset. | `skm preset update frontend-basic brainstorming` |
 | `skm preset delete [name]` | Delete a preset from global `presets.yaml`. | `skm preset delete frontend-basic` |
 
@@ -102,7 +102,7 @@ Quick notes:
 - `skm preset delete ...` warns when the preset is still referenced by project state
 - One-level scope directories also become dynamic read-only presets. Example: `skillsDir/impeccable/*/SKILL.md` exposes a dynamic preset named `impeccable`
 - Dynamic presets expand to scoped skill names such as `impeccable/overdrive`
-- Dynamic presets are discoverable through `preset list` / `preset inspect`, but `preset add/update/delete` only works for static presets in `presets.yaml`
+- Dynamic presets are discoverable through `preset list` / `preset inspect`, but `preset create/update/delete` only works for static presets in `presets.yaml`
 - If a static preset name collides with a dynamic scope preset name, `skm` fails fast with a conflict error
 
 Example `presets.yaml`:

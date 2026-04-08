@@ -41,7 +41,7 @@ describe.sequential('ui API integration', () => {
           { dirName: 'test-engineer', name: 'test-engineer' },
         ]);
         await initConfigWithSkills(homeDir, skillsDir);
-        await runCli(['preset', 'add', 'frontend-v1', 'brainstorming', 'test-engineer'], { env: { HOME: homeDir } });
+        await runCli(['preset', 'create', 'frontend-v1', 'brainstorming', 'test-engineer'], { env: { HOME: homeDir } });
         await runCli(['skill', 'enable', 'brainstorming', '--target', '.agents'], { cwd: projectDir, env: { HOME: homeDir } });
         await runCli(['preset', 'enable', 'frontend-v1', '--target', '.agents'], { cwd: projectDir, env: { HOME: homeDir } });
 
@@ -150,7 +150,7 @@ describe.sequential('ui API integration', () => {
           { dirName: 'test-engineer', name: 'test-engineer' },
         ]);
         await initConfigWithSkills(homeDir, skillsDir);
-        await runCli(['preset', 'add', 'frontend-v1', 'brainstorming', 'test-engineer'], { env: { HOME: homeDir } });
+        await runCli(['preset', 'create', 'frontend-v1', 'brainstorming', 'test-engineer'], { env: { HOME: homeDir } });
         await runCli(['skill', 'enable', 'brainstorming', '--target', '.agents'], { cwd: projectDir, env: { HOME: homeDir } });
         await runCli(['preset', 'enable', 'frontend-v1', '--target', '.agents'], { cwd: projectDir, env: { HOME: homeDir } });
 
@@ -217,7 +217,7 @@ describe.sequential('ui API integration', () => {
           { dirName: 'test-engineer', name: 'test-engineer' },
         ]);
         await initConfigWithSkills(homeDir, skillsDir);
-        await runCli(['preset', 'add', 'frontend-v1', 'brainstorming', 'test-engineer'], { env: { HOME: homeDir } });
+        await runCli(['preset', 'create', 'frontend-v1', 'brainstorming', 'test-engineer'], { env: { HOME: homeDir } });
         await runCli(['preset', 'enable', 'frontend-v1', '--target', '.agents'], { cwd: projectDir, env: { HOME: homeDir } });
 
         process.env.HOME = homeDir;

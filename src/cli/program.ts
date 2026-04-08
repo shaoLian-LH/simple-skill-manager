@@ -426,7 +426,7 @@ function createProgram(deps: CliDependencies = {}): Command {
     });
 
   presetCommand
-    .command('add [name] [skills...]')
+    .command('create [name] [skills...]')
     .description('Create a preset with a non-empty list of skills.')
     .action(async (name: string | undefined, skills: string[] | undefined) => {
       const promptContext = { canPrompt: canPrompt(), prompt };
@@ -441,7 +441,7 @@ function createProgram(deps: CliDependencies = {}): Command {
 
       let presetName = name?.trim() ?? '';
       if (presetName.length === 0) {
-        ensurePromptable(promptContext, 'Preset name is required in non-interactive mode.', 'Run `skm preset add <name> <skill...>`.');
+        ensurePromptable(promptContext, 'Preset name is required in non-interactive mode.', 'Run `skm preset create <name> <skill...>`.');
         usedPrompt = true;
         while (true) {
           const candidate = (await prompt.input('Preset name')).trim();
@@ -463,7 +463,7 @@ function createProgram(deps: CliDependencies = {}): Command {
         createSkillChoices(availableSkills),
         'Select skills for the preset',
         'At least one skill is required in non-interactive mode.',
-        'Run `skm preset add <name> <skill...>`.',
+        'Run `skm preset create <name> <skill...>`.',
       );
       usedPrompt = usedPrompt || selectedSkills.usedPrompt;
       const normalizedSkills = stableUnique(selectedSkills.values);

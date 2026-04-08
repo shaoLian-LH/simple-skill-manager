@@ -65,7 +65,7 @@ describe('interactive workflows', () => {
       await initConfigWithSkills(homeDir, skillsDir);
 
       vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
-      await runCli(['node', 'skm', 'preset', 'add', 'frontend-v2', 'brainstorming', 'test-engineer']);
+      await runCli(['node', 'skm', 'preset', 'create', 'frontend-v2', 'brainstorming', 'test-engineer']);
 
       const promptAdapter = new FakePromptAdapter({ selectOne: ['frontend-v2'] });
 
@@ -126,7 +126,7 @@ describe('interactive workflows', () => {
       await initConfigWithSkills(homeDir, skillsDir);
 
       vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
-      await runCli(['node', 'skm', 'preset', 'add', 'frontend-v2', 'brainstorming']);
+      await runCli(['node', 'skm', 'preset', 'create', 'frontend-v2', 'brainstorming']);
 
       vi.restoreAllMocks();
       let stdout = '';
@@ -148,7 +148,7 @@ describe('interactive workflows', () => {
     });
   });
 
-  it('short-circuits preset add before prompting when interactive missing-name and no skills exist', async () => {
+  it('short-circuits preset create before prompting when interactive missing-name and no skills exist', async () => {
     await withTempDir('skm-home-', async (homeDir) => {
       process.env.HOME = homeDir;
       const skillsDir = path.join(homeDir, 'skills-registry');
@@ -161,7 +161,7 @@ describe('interactive workflows', () => {
         return true;
       });
 
-      const exitCode = await runCli(['node', 'skm', 'preset', 'add'], {
+      const exitCode = await runCli(['node', 'skm', 'preset', 'create'], {
         promptAdapter: new FakePromptAdapter(),
         isInteractiveSession: () => true,
       });

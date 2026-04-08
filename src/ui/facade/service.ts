@@ -142,9 +142,9 @@ function buildPresetsQuickActions(locale: UiLocale): QuickActionView[] {
       command: 'skm preset list',
     },
     {
-      id: 'preset-add',
+      id: 'preset-create',
       label: t(locale, 'facade.createPreset'),
-      command: 'skm preset add <name> <skill...>',
+      command: 'skm preset create <name> <skill...>',
     },
     {
       id: 'preset-update',
