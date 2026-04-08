@@ -1,22 +1,29 @@
 # simple-skill-manager
 
-中文版本：`README.zh-CN.md`
+[English](./README.md) | [简体中文](./README.zh-CN.md)
 
-`simple-skill-manager` (`skm`) is a Node.js CLI for managing local skill visibility and linking selected skills into project or global targets such as `.agents`, `.trae`, `.kiro`, `.claude`, and `.gemini`.
+`simple-skill-manager` (`skm`) is a Node.js CLI for managing local skills and linking selected skills into project-level or global target directories such as `.agents`, `.trae`, `.kiro`, `.claude`, and `.gemini`.
 
-It does not execute skills. It manages:
-- the global skills directory
-- preset definitions
-- project-local `.skm/state.json`
-- global `~/.simple-skill-manager/global-state.json`
-- target installation via symlink with copy fallback
-- generated Gemini command projections
+It does not execute skills. It helps you organize skill visibility, activation state, and target installation.
+
+## Features
+
+- Manage a global `skillsDir` and discover local skills automatically
+- Enable or disable skills in project scope or global scope
+- Group skills with reusable presets
+- Install into multiple targets with symlink-first behavior and copy fallback
+- Reconcile drift with `sync` and diagnose issues with `doctor`
+- Generate `.gemini` command projections automatically
+- Launch a local Web UI with `skm ui`
 
 ## Requirements
 
 - Node.js 20+
+- pnpm 10+
 
-## Install for local development
+## Installation
+
+### Local development
 
 ```bash
 pnpm install
@@ -24,9 +31,9 @@ pnpm run build
 node dist/skm.js --help
 ```
 
-The packaged CLI entry is exposed through `package.json#bin` as `skm`.
+The packaged CLI is exposed as `skm` through `package.json#bin`.
 
-Expose the local package as a global CLI during development:
+### Link as a global CLI during development
 
 ```bash
 pnpm run link:global
@@ -34,88 +41,106 @@ skm --help
 pnpm run unlink:global
 ```
 
-## Initial setup
+## Quick Start
 
-Initialize the global app directory under `~/.simple-skill-manager/`:
+### 1. Initialize the global app directory
 
 ```bash
 skm config init
 ```
 
-Point `skm` at the directory that contains your skill folders:
+This creates:
+
+- `~/.simple-skill-manager/config.json`
+- `~/.simple-skill-manager/presets.yaml`
+- `~/.simple-skill-manager/projects.json`
+- `~/.simple-skill-manager/skills/`
+
+### 2. Point `skm` to your skills directory
 
 ```bash
 skm config set skills-dir ~/my-skills
 ```
 
-Check the effective config:
+### 3. Check the effective config
 
 ```bash
 skm config get
 ```
 
-`config init` creates:
-- `~/.simple-skill-manager/config.json`
-- `~/.simple-skill-manager/presets.yaml`
-- `~/.simple-skill-manager/projects.json`
-- `~/.simple-skill-manager/skills/` as the default local skills directory
+### 4. Explore available skills
 
-Once setup is done, everything below is a command quick reference.
+```bash
+skm skill list
+skm skill inspect brainstorming
+```
 
-## Command quick reference
+### 5. Enable skills or presets
+
+```bash
+skm skill enable brainstorming --target .agents
+skm preset enable frontend-basic --target .claude
+```
+
+### 6. Keep installations healthy
+
+```bash
+skm sync
+skm doctor
+```
+
+## Commands
 
 ### `config`
 
-| Command | Purpose | Example / note |
-| --- | --- | --- |
-| `skm config init` | Create the global app directory and default files. | Run this first on a new machine. |
-| `skm config get` | Print the current global config as JSON. | `skm config get` |
-| `skm config set skills-dir <path>` | Update `skillsDir` to an existing directory. | `skm config set skills-dir ~/my-skills` |
+| Command | Description |
+| --- | --- |
+| `skm config init` | Initialize the global app directory and default files |
+| `skm config get` | Print the current global config as JSON |
+| `skm config set skills-dir <path>` | Update `skillsDir` to an existing directory |
 
 ### `skill`
 
-| Command | Purpose | Example / note |
-| --- | --- | --- |
-| `skm skill list` | List all discovered skills from the configured `skillsDir`, including scoped skills. | `skm skill list` |
-| `skm skill inspect [name]` | Show the source path, frontmatter, and body preview for one skill. | `skm skill inspect brainstorming` |
-| `skm skill enable [names...] --target <target>` | Enable one or more skills in the current project and install them into one or more targets. | `skm skill enable brainstorming --target .agents` |
-| `skm skill enable [names...] --global --target <target>` | Enable one or more skills in global scope. | `skm skill enable brainstorming --global --target .claude` |
-| `skm skill disable [names...]` | Disable explicitly enabled skills in the current project. | `skm skill disable brainstorming` |
-| `skm skill disable [names...] --global` | Disable explicitly enabled skills in global scope. | `skm skill disable brainstorming --global` |
-
-Quick notes:
-- Repeat `--target` to install into multiple targets: `--target .agents --target .trae`
-- If the project already has recorded targets, interactive flows reuse them as defaults; otherwise the global default target is `.agents`
-- Global enable flows never read `config.defaultTargets`; pass `--global` explicitly, then choose or provide targets for the global scope
-- In a TTY session, commands with optional names can prompt you to select entries interactively
-- One-level scoped skills are supported as `<scope>/<skill>`. Example: `impeccable/overdrive` resolves from `skillsDir/impeccable/overdrive/SKILL.md`
-- `.gemini` installs are generated command files, not linked skill directories
+| Command | Description |
+| --- | --- |
+| `skm skill list` | List all discovered skills from `skillsDir` |
+| `skm skill inspect [name]` | Show one skill's path, frontmatter, and preview |
+| `skm skill enable [names...] --target <target>` | Enable one or more skills in the current project |
+| `skm skill enable [names...] --global --target <target>` | Enable one or more skills in global scope |
+| `skm skill disable [names...]` | Disable project-scoped skills |
+| `skm skill disable [names...] --global` | Disable globally enabled skills |
 
 ### `preset`
 
-| Command | Purpose | Example / note |
-| --- | --- | --- |
-| `skm preset list` | List all configured presets. | `skm preset list` |
-| `skm preset inspect [name]` | Show the skill list expanded from one preset. | `skm preset inspect frontend-basic` |
-| `skm preset enable [names...] --target <target>` | Enable one or more presets in the current project. | `skm preset enable frontend-basic --target .agents` |
-| `skm preset enable [names...] --global --target <target>` | Enable one or more presets in global scope. | `skm preset enable frontend-basic --global --target .gemini` |
-| `skm preset disable [names...]` | Disable one or more presets in the current project. | `skm preset disable frontend-basic` |
-| `skm preset disable [names...] --global` | Disable one or more presets in global scope. | `skm preset disable frontend-basic --global` |
-| `skm preset create [name] [skills...]` | Create a preset with a non-empty skill list. | `skm preset create frontend-basic brainstorming test-engineer` |
-| `skm preset update [name] [skills...]` | Replace the full skill list for an existing preset. | `skm preset update frontend-basic brainstorming` |
-| `skm preset delete [name]` | Delete a preset from global `presets.yaml`. | `skm preset delete frontend-basic` |
+| Command | Description |
+| --- | --- |
+| `skm preset list` | List all configured presets |
+| `skm preset inspect [name]` | Show the expanded skill list for one preset |
+| `skm preset enable [names...] --target <target>` | Enable one or more presets in the current project |
+| `skm preset enable [names...] --global --target <target>` | Enable one or more presets in global scope |
+| `skm preset disable [names...]` | Disable project-scoped presets |
+| `skm preset disable [names...] --global` | Disable globally enabled presets |
+| `skm preset create [name] [skills...]` | Create a static preset |
+| `skm preset update [name] [skills...]` | Replace a static preset's full skill list |
+| `skm preset delete [name]` | Delete a static preset from `presets.yaml` |
 
-Quick notes:
-- Presets live in `~/.simple-skill-manager/presets.yaml`
-- Each preset is `preset-name -> [skill-name, ...]`
-- `skm preset enable ...` expands preset names into the skill names stored in `presets.yaml`
-- `skm preset delete ...` warns when the preset is still referenced by project state
-- One-level scope directories also become dynamic read-only presets. Example: `skillsDir/impeccable/*/SKILL.md` exposes a dynamic preset named `impeccable`
-- Dynamic presets expand to scoped skill names such as `impeccable/overdrive`
-- Dynamic presets are discoverable through `preset list` / `preset inspect`, but `preset create/update/delete` only works for static presets in `presets.yaml`
-- If a static preset name collides with a dynamic scope preset name, `skm` fails fast with a conflict error
+### `sync`, `doctor`, and `ui`
 
-Example `presets.yaml`:
+| Command | Description |
+| --- | --- |
+| `skm sync` | Reconcile installed targets with `.skm/state.json` |
+| `skm sync --global` | Reconcile installed targets with `global-state.json` |
+| `skm doctor` | Inspect project drift, missing sources, and broken installs |
+| `skm doctor --global` | Inspect global drift, missing sources, and broken installs |
+| `skm ui` | Start the local Web UI server |
+| `skm ui --port <port>` | Start the Web UI on a preferred local port |
+| `skm ui --no-open` | Start the Web UI without opening a browser |
+
+## Presets
+
+Presets live in `~/.simple-skill-manager/presets.yaml`.
+
+Example:
 
 ```yaml
 frontend-basic:
@@ -131,60 +156,59 @@ design-review:
   - impeccable/polish
 ```
 
-### `sync` and `doctor`
+Notes:
 
-| Command | Purpose | Example / note |
-| --- | --- | --- |
-| `skm sync` | Reconcile installed target entries so they match `.skm/state.json`. | Run after fixing missing files or target drift. |
-| `skm sync --global` | Reconcile installed target entries so they match `global-state.json`. | Run after fixing missing files or target drift in global scope. |
-| `skm doctor` | Inspect project drift, missing sources, stale index entries, broken links, and missing preset definitions. | `skm doctor` |
-| `skm doctor --global` | Inspect global drift, missing sources, broken links, and missing preset definitions. | `skm doctor --global` |
+- Static presets are created, updated, and deleted through `skm preset ...`
+- One-level scope directories also become dynamic read-only presets
+- `skillsDir/impeccable/*/SKILL.md` exposes a dynamic preset named `impeccable`
+- Dynamic presets expand to scoped skill names such as `impeccable/overdrive`
+- Name collisions between static presets and dynamic scope presets fail fast
 
-## State and files
+## Installation Layout
 
-| Path | Purpose |
-| --- | --- |
-| `~/.simple-skill-manager/config.json` | Global config, including `skillsDir` and `defaultTargets` |
-| `~/.simple-skill-manager/presets.yaml` | Global preset definitions |
-| `~/.simple-skill-manager/projects.json` | Mirror index of known project state |
-| `~/.simple-skill-manager/global-state.json` | Authoritative global activation state |
-| `.skm/state.json` | Authoritative project-local state |
-
-Related behavior:
-- `skm skill enable ...` and `skm preset enable ...` create or update `.skm/state.json`
-- Those commands also ensure `.gitignore` contains `.skm`
-- Successful command output is JSON unless the CLI is returning a plain message or error
-
-## Install behavior
-
-Project-scoped installs land at:
+Project-scoped installs:
 
 ```text
 <project>/<target>/skills/<skill-name>
 ```
 
-Global skill-directory installs land at:
+Global installs:
 
 ```text
 ~/<target>/skills/<skill-name>
 ```
 
-Gemini command installs land at:
+Gemini command projections:
 
 ```text
 <project>/.gemini/commands/<scope>/<skill>.toml
 ~/.gemini/commands/<scope>/<skill>.toml
 ```
 
-Install rules:
-- supported targets are `.agents`, `.trae`, `.kiro`, `.claude`, and `.gemini`
-- `skm` prefers symlinks
-- it falls back to copying when symlink creation fails
-- the chosen `installMode` is recorded in `.skm/state.json`
-- later syncs preserve the recorded install mode
+Rules:
+
+- Supported targets are `.agents`, `.trae`, `.kiro`, `.claude`, and `.gemini`
+- `skm` prefers symlinks and falls back to copying when needed
+- The chosen `installMode` is recorded in state
 - `.gemini` uses generated `.toml` files and records `installMode` as `generated`
 
-## Common failures
+## State Files
+
+| Path | Purpose |
+| --- | --- |
+| `~/.simple-skill-manager/config.json` | Global config including `skillsDir` and `defaultTargets` |
+| `~/.simple-skill-manager/presets.yaml` | Global preset definitions |
+| `~/.simple-skill-manager/projects.json` | Mirror index of known project state |
+| `~/.simple-skill-manager/global-state.json` | Authoritative global activation state |
+| `.skm/state.json` | Authoritative project-local activation state |
+
+Related behavior:
+
+- `skm skill enable ...` and `skm preset enable ...` create or update `.skm/state.json`
+- Those commands also ensure `.gitignore` contains `.skm`
+- Successful command output is JSON unless the CLI returns a plain message or an error
+
+## Common Issues
 
 | Problem | Fix |
 | --- | --- |
@@ -192,7 +216,7 @@ Install rules:
 | `skillsDir` is missing or invalid | Run `skm config set skills-dir <path>` with an existing directory |
 | Duplicate skill names exist | Fix conflicting `name` fields in `SKILL.md` frontmatter |
 | `presets.yaml` is invalid | Repair `~/.simple-skill-manager/presets.yaml` so each preset maps to a string array |
-| A target path is already occupied by an unrelated file or directory | Remove the conflicting entry at `<target>/skills/<skill-name>` and run `skm sync` again |
+| A target path is occupied by an unrelated file or directory | Remove the conflicting entry and run `skm sync` again |
 
 ## Development
 
@@ -202,11 +226,11 @@ pnpm run build
 node dist/skm.js --help
 ```
 
-## Publish workflow
+## Publish
 
 ```bash
 pnpm run publish:verify
 pnpm publish --dry-run
 ```
 
-`pnpm publish` automatically runs `prepublishOnly`, which calls `pnpm run publish:verify` to execute tests, type checks, and build before publishing.
+`pnpm publish` runs `prepublishOnly`, which calls `pnpm run publish:verify` before publishing.
