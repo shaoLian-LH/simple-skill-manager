@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue';
+import { computed, onMounted, ref, watch, watchEffect } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 
 import { ApiRequestError, apiRequest } from '../lib/api';
@@ -55,7 +55,7 @@ const filteredSkillRows = computed(() => {
 
 function buildWorkspaceContext(current: PresetDetailView): void {
   setWorkspaceContext({
-    scopeLabel: t('presetDetail.scopeLabel'),
+    scopeLabel: current.name,
     scopeDescription: t('presetDetail.scopeDescription', {
       name: current.name,
       status: sourceStateLabel(locale.value, current.source, current.readonly),
@@ -198,6 +198,22 @@ function openProjectDetail(projectId: string): void {
   void router.push(withLocalePath(`/projects/${encodeURIComponent(projectId)}`));
 }
 
+watchEffect(() => {
+  if (loading.value || errorMessage.value || !detail.value) {
+    setQuickActions([]);
+    return;
+  }
+
+  setQuickActions([
+    {
+      id: 'preset-detail-back',
+      label: t('common.back'),
+      command: 'history:back/presets',
+      tone: 'ghost',
+    },
+  ]);
+});
+
 watch(
   () => presetName.value,
   () => {
@@ -217,42 +233,16 @@ onMounted(() => {
       {{ errorMessage }}
     </section>
     <template v-else-if="detail">
-      <header class="panel">
-        <p class="field-label">{{ t('presetDetail.workspaceLabel') }}</p>
-        <div class="mt-2 flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-          <div class="min-w-0">
-            <h3 class="truncate font-display text-2xl text-ink">{{ detail.name }}</h3>
-            <div class="mt-2 flex flex-wrap gap-2">
-              <span
-                class="rounded-full border px-2.5 py-1 text-xs font-semibold"
-                :class="
-                  detail.readonly
-                    ? 'border-ink/25 bg-white/80 text-ink/80'
-                    : detail.source === 'dynamic'
-                      ? 'border-olive/40 bg-olive/10 text-olive'
-                      : 'border-copper/40 bg-copper/10 text-copper'
-                "
-              >
-                {{ sourceStateLabel(locale, detail.source, detail.readonly) }}
-              </span>
-              <span class="rounded-full border border-ink/20 bg-white/80 px-2.5 py-1 text-xs font-semibold text-ink/80">
-                {{ t('presetDetail.skillCount', { count: detail.skillCount }) }}
-              </span>
-              <span class="rounded-full border border-ink/20 bg-white/80 px-2.5 py-1 text-xs font-semibold text-ink/80">
-                {{ t('presetDetail.projectCount', { count: detail.referenceCount }) }}
-              </span>
-            </div>
-          </div>
-          <button
-            type="button"
-            class="btn-secondary"
-            :disabled="deleting || detail.readonly"
-            @click="deletePreset"
-          >
-            {{ detail.readonly ? t('common.readonly') : deleting ? t('common.deleting') : t('presetDetail.deleteAction') }}
-          </button>
-        </div>
-      </header>
+      <div class="flex justify-end">
+        <button
+          type="button"
+          class="btn-secondary"
+          :disabled="deleting || detail.readonly"
+          @click="deletePreset"
+        >
+          {{ detail.readonly ? t('common.readonly') : deleting ? t('common.deleting') : t('presetDetail.deleteAction') }}
+        </button>
+      </div>
 
       <p
         v-if="actionMessage"

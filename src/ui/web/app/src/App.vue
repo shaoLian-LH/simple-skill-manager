@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, provide, ref, watch } from 'vue';
-import { RouterLink, RouterView, useRoute } from 'vue-router';
+import { RouterLink, RouterView, useRoute, useRouter } from 'vue-router';
 
 import { ApiRequestError, apiRequest } from './lib/api';
 import { bootViewKey, launchStatusKey, quickActionsKey, workspaceSpineKey } from './lib/chrome';
@@ -9,12 +9,14 @@ import { animateRouteSwap } from './lib/motion';
 import type { BootView, LaunchStatusView, QuickActionView, WorkspaceSpineView } from './types';
 
 const route = useRoute();
+const router = useRouter();
 const { locale, t, withLocalePath } = useUiI18n();
 const stageRef = ref<HTMLElement | null>(null);
 const bootView = ref<BootView | null>(null);
 const launchStatus = ref<LaunchStatusView | null>(null);
 const workspaceSpine = ref<WorkspaceSpineView | null>(null);
 const quickActions = ref<QuickActionView[]>([]);
+const pendingQuickActionIds = ref<Set<string>>(new Set());
 const toast = ref('');
 
 provide(bootViewKey, bootView);
@@ -57,20 +59,41 @@ const routeDescription = computed(() => {
   }
 });
 
-const launchFolderName = computed(() => {
+function shortenPath(input: string): string {
+  if (!input) {
+    return '';
+  }
+
+  const normalized = input.replace(/\\/g, '/').replace(/\/+$/, '');
+  const segments = normalized.split('/').filter(Boolean);
+  if (segments.length <= 2) {
+    return normalized || input;
+  }
+  return `${segments.at(-2)}/${segments.at(-1)}`;
+}
+
+const shortLaunchPath = computed(() => {
   const launchCwd = bootView.value?.launchCwd ?? '';
   if (!launchCwd) return t('common.unknown');
-  const normalized = launchCwd.replace(/\\/g, '/').replace(/\/+$/, '');
-  const segments = normalized.split('/').filter(Boolean);
-  return segments.at(-1) ?? launchCwd;
+  return shortenPath(launchCwd) || launchCwd;
 });
 
-const runtimeLine = computed(() => {
-  if (!launchStatus.value) return t('app.checkingRuntime');
-  return launchStatus.value.usedPortFallback
-    ? t('app.runningRuntimeFallback', { port: launchStatus.value.port })
-    : t('app.runningRuntime', { port: launchStatus.value.port });
-});
+const hasHeaderOperators = computed(() => quickActions.value.length > 0);
+const showUnmatchedDirectory = computed(() => bootView.value !== null && !bootView.value.matchedProjectId);
+
+function setQuickActionPending(actionId: string, nextValue: boolean): void {
+  const next = new Set(pendingQuickActionIds.value);
+  if (nextValue) {
+    next.add(actionId);
+  } else {
+    next.delete(actionId);
+  }
+  pendingQuickActionIds.value = next;
+}
+
+function isQuickActionPending(actionId: string): boolean {
+  return pendingQuickActionIds.value.has(actionId);
+}
 
 function showToast(message: string): void {
   toast.value = message;
@@ -103,19 +126,48 @@ async function refreshLaunchStatus(): Promise<void> {
   }
 }
 
-async function openLaunchCwd(): Promise<void> {
+async function runQuickAction(action: QuickActionView): Promise<void> {
+  if (isQuickActionPending(action.id)) {
+    return;
+  }
+
+  setQuickActionPending(action.id, true);
+
   try {
-    const result = await apiRequest<{ message: string }>('/api/launch-cwd/open', {
-      method: 'POST',
-      body: JSON.stringify({}),
-    });
-    showToast(result.message);
+    if (action.command.startsWith('history:back')) {
+      const fallbackPath = action.command.slice('history:back'.length) || '/projects';
+      if (window.history.length > 1) {
+        await router.back();
+      } else {
+        await router.push(withLocalePath(fallbackPath));
+      }
+      return;
+    }
+
+    if (action.command.startsWith('project:open:')) {
+      const projectId = action.command.slice('project:open:'.length);
+      if (!projectId) {
+        return;
+      }
+      const payload = await apiRequest<{ message: string }>(`/api/projects/${encodeURIComponent(projectId)}/quick-open`, {
+        method: 'POST',
+        body: JSON.stringify({}),
+      });
+      showToast(payload.message);
+      return;
+    }
+
+    if (action.command.startsWith('/')) {
+      await router.push(withLocalePath(action.command));
+    }
   } catch (error) {
     if (error instanceof ApiRequestError) {
       showToast(error.detail.message);
       return;
     }
-    showToast(t('app.openLaunchFolderFailed'));
+    showToast(t('projectDetail.openFailed'));
+  } finally {
+    setQuickActionPending(action.id, false);
   }
 }
 
@@ -130,6 +182,7 @@ watch(
   () => route.fullPath,
   async () => {
     quickActions.value = [];
+    pendingQuickActionIds.value = new Set();
     await nextTick();
     if (stageRef.value) {
       animateRouteSwap(stageRef.value);
@@ -149,8 +202,8 @@ watch(
 </script>
 
 <template>
-  <div class="app-bg min-h-screen p-4 md:p-6">
-    <div class="mx-auto grid max-w-[1680px] gap-4 xl:grid-cols-[220px_minmax(0,1fr)_320px]">
+  <div class="app-bg min-h-screen">
+    <div class="app-layout">
       <aside class="workbench-shell nav-shell">
         <div class="space-y-6">
           <div>
@@ -173,61 +226,57 @@ watch(
         </div>
       </aside>
 
-      <main ref="stageRef" class="workbench-shell workspace-shell">
-        <header class="workspace-header">
-          <p class="field-label">{{ t('app.workspace') }}</p>
-          <h2 class="workspace-title">{{ routeTitle }}</h2>
-          <p class="workspace-desc">{{ routeDescription }}</p>
-        </header>
-        <section class="workspace-body">
-          <RouterView />
-        </section>
-      </main>
-
-      <aside class="workbench-shell spine-shell">
-        <header class="spine-header">
-          <p class="field-label">{{ t('app.contextRuntime') }}</p>
-          <h3 class="spine-title">{{ t('app.currentSession') }}</h3>
-        </header>
-
-        <section class="spine-group">
-          <p class="spine-label">{{ t('app.launchCwd') }}</p>
-          <p class="spine-value" :title="bootView?.launchCwd || t('common.unknownPath')">{{ launchFolderName }}</p>
-          <div class="spine-row">
-            <button v-if="bootView?.launchCwd" type="button" class="inline-link bg-transparent p-0" @click="openLaunchCwd">
-              {{ t('common.openFolder') }}
-            </button>
-            <span v-else class="spine-hint">{{ t('app.folderPathUnavailable') }}</span>
+      <div class="workspace-stage">
+        <section class="context-band" aria-label="Workspace context">
+          <div class="context-meta-item">
+            <p v-if="showUnmatchedDirectory" class="context-meta-note">
+              {{ t('app.unmatchedLaunchDirectory') }}
+            </p>
+            <a
+              v-if="bootView?.launchCwd"
+              href="/api/launch-cwd/open"
+              class="path-link"
+              :title="bootView.launchCwd"
+            >
+              {{ shortLaunchPath }}
+            </a>
+            <p v-else class="context-meta-value" :title="t('common.unknownPath')">
+              {{ t('common.unknownPath') }}
+            </p>
           </div>
         </section>
 
-        <section class="spine-group">
-          <p class="spine-label">{{ t('app.projectMatch') }}</p>
-          <div class="spine-row">
-            <span class="status-pill" :class="bootView?.matchedProjectId ? 'status-pill-match' : 'status-pill-off'">
-              {{ bootView?.matchedProjectId ? t('common.matchedProject') : t('common.noMatch') }}
-            </span>
-          </div>
-          <p v-if="bootView?.matchedProjectName" class="spine-hint">{{ bootView.matchedProjectName }}</p>
-        </section>
+        <main ref="stageRef" class="workbench-shell workspace-shell">
+          <header class="workspace-header" :class="{ 'workspace-header--detail': hasHeaderOperators }">
+            <div class="workspace-header-main">
+              <p class="field-label">{{ t('app.workspace') }}</p>
+              <h2 class="workspace-title">{{ routeTitle }}</h2>
+              <p class="workspace-desc">{{ routeDescription }}</p>
+            </div>
 
-        <section class="spine-group">
-          <p class="spine-label">{{ t('app.scopeTargets') }}</p>
-          <p class="spine-value">{{ workspaceSpine?.scopeLabel ?? t('app.contextAwareWorkbench') }}</p>
-          <p class="spine-hint">
-            {{ workspaceSpine?.scopeDescription ?? t('app.routeDesc.fallback') }}
-          </p>
-          <p v-if="workspaceSpine?.targets?.length" class="spine-hint">
-            {{ t('app.targets', { targets: workspaceSpine.targets.join(', ') }) }}
-          </p>
-        </section>
-
-        <section class="spine-group">
-          <p class="spine-label">{{ t('app.runtime') }}</p>
-          <p class="spine-value">{{ runtimeLine }}</p>
-          <p class="spine-hint">{{ launchStatus?.url ?? t('app.waitingRuntimeStatus') }}</p>
-        </section>
-      </aside>
+            <div v-if="hasHeaderOperators" class="workspace-operators">
+              <button
+                v-for="action in quickActions"
+                :key="action.id"
+                type="button"
+                class="workspace-operator"
+                :class="{
+                  'btn-primary': action.tone === 'primary',
+                  'btn-ghost': action.tone === 'ghost',
+                  'btn-secondary': !action.tone || action.tone === 'secondary',
+                }"
+                :disabled="isQuickActionPending(action.id)"
+                @click="runQuickAction(action)"
+              >
+                {{ isQuickActionPending(action.id) ? action.loadingLabel ?? action.label : action.label }}
+              </button>
+            </div>
+          </header>
+          <section class="workspace-body">
+            <RouterView />
+          </section>
+        </main>
+      </div>
     </div>
 
     <div v-if="toast" class="toast">{{ toast }}</div>

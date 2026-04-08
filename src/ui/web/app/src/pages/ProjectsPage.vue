@@ -3,7 +3,7 @@ import { computed, onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
 
 import { ApiRequestError, apiRequest } from '../lib/api';
-import { useSetQuickActions } from '../lib/chrome';
+import { useSetQuickActions, useWorkspaceSpine } from '../lib/chrome';
 import { useUiI18n } from '../lib/i18n';
 import type { QuickOpenView } from '../types';
 
@@ -38,6 +38,14 @@ const filteredRows = computed(() => {
     return blob.includes(query);
   });
 });
+
+useWorkspaceSpine(() => ({
+  scopeLabel: t('projects.title'),
+  scopeDescription:
+    rows.value.length > 0
+      ? t('projects.showingCount', { shown: filteredRows.value.length, total: rows.value.length })
+      : errorMessage.value || t('projects.description'),
+}));
 
 function asRecord(value: unknown): Record<string, unknown> | null {
   if (typeof value !== 'object' || value === null) {
@@ -164,12 +172,7 @@ onMounted(() => {
 <template>
   <section class="space-y-4">
     <header class="panel">
-      <p class="field-label">{{ t('projects.workspaceLabel') }}</p>
-      <div class="mt-2 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
-        <div>
-          <h3 class="font-display text-2xl text-ink">{{ t('projects.title') }}</h3>
-          <p class="mt-1 text-sm text-ink/70">{{ t('projects.description') }}</p>
-        </div>
+      <div class="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
         <p class="text-sm text-ink/70">
           {{ t('projects.showingCount', { shown: filteredRows.length, total: rows.length }) }}
         </p>

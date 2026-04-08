@@ -3,14 +3,13 @@ import { computed, onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
 
 import { ApiRequestError, apiRequest } from '../lib/api';
-import { useSetQuickActions, useSetWorkspaceContext } from '../lib/chrome';
+import { useSetQuickActions, useWorkspaceSpine } from '../lib/chrome';
 import { useUiI18n } from '../lib/i18n';
 import { sourceStateLabel } from '../../../../text.js';
 import type { PresetsView, PresetView } from '../types';
 
 const router = useRouter();
 const setQuickActions = useSetQuickActions();
-const setWorkspaceContext = useSetWorkspaceContext();
 const { locale, t, withLocalePath } = useUiI18n();
 
 const loading = ref(true);
@@ -34,6 +33,14 @@ const filteredPresets = computed(() => {
   });
 });
 
+useWorkspaceSpine(() => ({
+  scopeLabel: t('presets.title'),
+  scopeDescription:
+    presets.value.length > 0
+      ? t('presets.showingCount', { shown: filteredPresets.value.length, total: presets.value.length })
+      : errorMessage.value || t('presets.scopeDescription'),
+}));
+
 function formatSummary(preset: PresetView): string {
   return t('presets.summary', {
     skillCount: preset.skillCount,
@@ -49,20 +56,12 @@ async function loadPresets(): Promise<void> {
   try {
     const payload = await apiRequest<PresetsView>('/api/presets');
     presets.value = [...payload.items].sort((left, right) => left.name.localeCompare(right.name));
-    setWorkspaceContext({
-      scopeLabel: t('presets.scopeLabel'),
-      scopeDescription: t('presets.scopeDescription'),
-    });
   } catch (error) {
     if (error instanceof ApiRequestError) {
       errorMessage.value = error.detail.message;
     } else {
       errorMessage.value = t('presets.loadFailed');
     }
-    setWorkspaceContext({
-      scopeLabel: t('presets.scopeLabel'),
-      scopeDescription: t('presets.scopeErrorDescription'),
-    });
   } finally {
     loading.value = false;
   }
@@ -80,12 +79,7 @@ onMounted(() => {
 <template>
   <section class="space-y-4">
     <header class="panel">
-      <p class="field-label">{{ t('presets.workspaceLabel') }}</p>
-      <div class="mt-2 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
-        <div>
-          <h3 class="font-display text-2xl text-ink">{{ t('presets.title') }}</h3>
-          <p class="mt-1 text-sm text-ink/70">{{ t('presets.description') }}</p>
-        </div>
+      <div class="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
         <p class="text-sm text-ink/70">
           {{ t('presets.showingCount', { shown: filteredPresets.length, total: presets.length }) }}
         </p>

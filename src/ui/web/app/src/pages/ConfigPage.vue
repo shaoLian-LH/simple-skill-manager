@@ -2,7 +2,7 @@
 import { computed, onMounted, ref } from 'vue';
 
 import { ApiRequestError, apiRequest } from '../lib/api';
-import { useSetQuickActions } from '../lib/chrome';
+import { useSetQuickActions, useWorkspaceSpine } from '../lib/chrome';
 import { useUiI18n } from '../lib/i18n';
 
 interface ConfigStoragePaths {
@@ -118,6 +118,15 @@ const baselineSummary = computed(() => {
     usesManualEntry: !activeBaseline.folderPickerSupported,
   };
 });
+
+useWorkspaceSpine(() => ({
+  scopeLabel: t('nav.config'),
+  scopeDescription: pageError.value
+    ? pageError.value
+    : `${t('config.supportedTargets', { count: baselineSummary.value.supportedTargetCount })} ${
+        baselineSummary.value.usesManualEntry ? t('config.manualEntry') : t('config.pickerAvailable')
+      }`,
+}));
 
 function clearMessages(): void {
   successMessage.value = '';
@@ -274,7 +283,6 @@ onMounted(() => {
 
     <template v-else>
       <section class="panel">
-        <p class="field-label">{{ t('config.workspaceLabel') }}</p>
         <div class="mt-2 grid gap-3 md:grid-cols-2">
           <div class="rounded-xl border border-ink/10 bg-paper/75 p-3">
             <p class="text-xs uppercase tracking-[0.12em] text-ink/60">{{ t('config.activeSkillsDir') }}</p>

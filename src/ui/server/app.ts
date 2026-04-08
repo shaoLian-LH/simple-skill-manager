@@ -29,6 +29,20 @@ function notFoundApiRoute(pathname: string, locale: UiLocale): SkmError {
   });
 }
 
+function resolveReturnLocation(request: IncomingMessage): string {
+  const referer = request.headers.referer;
+  if (!referer) {
+    return '/';
+  }
+
+  try {
+    const parsed = new URL(referer);
+    return `${parsed.pathname}${parsed.search}${parsed.hash}` || '/';
+  } catch {
+    return '/';
+  }
+}
+
 export interface UiRequestHandlerOptions {
   facade: UiFacade;
   getLaunchStatus: () => LaunchStatusView;
@@ -118,6 +132,17 @@ export function createUiRequestHandler(options: UiRequestHandlerOptions): (reque
 
       if (method === 'GET' && pathname === '/api/boot') {
         sendJson(response, 200, ok(await options.getBoot()));
+        return;
+      }
+
+      if (method === 'GET' && pathname === '/api/launch-cwd/open') {
+        const boot = await options.getBoot();
+        await options.facade.quickOpenPath(boot.launchCwd, locale);
+        response.writeHead(303, {
+          location: resolveReturnLocation(request),
+          'cache-control': 'no-store',
+        });
+        response.end();
         return;
       }
 

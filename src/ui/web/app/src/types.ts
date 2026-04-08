@@ -21,6 +21,8 @@ export interface QuickActionView {
   id: string;
   label: string;
   command: string;
+  loadingLabel?: string;
+  tone?: 'primary' | 'secondary' | 'ghost';
 }
 
 export interface ProjectReferenceView {

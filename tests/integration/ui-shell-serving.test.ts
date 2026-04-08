@@ -105,6 +105,15 @@ describe.sequential('ui shell serving and quick-open endpoint', () => {
             message: 'Opened in VS Code.',
           });
 
+          const launchCwdLinkResponse = await fetch(`${server.launchStatus.url}/api/launch-cwd/open`, {
+            redirect: 'manual',
+            headers: {
+              referer: `${server.launchStatus.url}/projects/demo-id?view=details#section`,
+            },
+          });
+          expect(launchCwdLinkResponse.status).toBe(303);
+          expect(launchCwdLinkResponse.headers.get('location')).toBe('/projects/demo-id?view=details#section');
+
           const successResponse = await fetch(
             `${server.launchStatus.url}/api/projects/${encodeURIComponent(projectId ?? '')}/quick-open`,
             {

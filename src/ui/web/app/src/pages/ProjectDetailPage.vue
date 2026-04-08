@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue';
+import { computed, onMounted, ref, watch, watchEffect } from 'vue';
 import { useRoute } from 'vue-router';
 
 import { ApiRequestError, apiRequest } from '../lib/api';
@@ -10,7 +10,6 @@ import type {
   ProjectDetailView,
   ProjectPresetControlView,
   ProjectSkillControlView,
-  QuickOpenView,
   ResolvedSkillView,
 } from '../types';
 
@@ -25,15 +24,12 @@ const actionMessage = ref('');
 const detail = ref<ProjectDetailView | null>(null);
 const busyPresetNames = ref<Set<string>>(new Set());
 const busySkillNames = ref<Set<string>>(new Set());
-const openingProject = ref(false);
 const skillSearch = ref('');
 
 const projectId = computed(() => {
   const raw = route.params.projectId;
   return typeof raw === 'string' ? raw : '';
 });
-
-const projectDisplayName = computed(() => detail.value?.displayName ?? '');
 
 const filteredEnabledSkillRows = computed(() => {
   return filterSkillRows(detail.value?.skillControls.enabled ?? []);
@@ -102,13 +98,6 @@ function buildWorkspaceContext(current: ProjectDetailView): void {
       updatedAt: formatDateTime(current.updatedAt),
     }),
     targets: current.targets,
-  });
-}
-
-function projectStatusLine(current: ProjectDetailView): string {
-  return t('projectDetail.targets', {
-    targets: current.targets.length > 0 ? current.targets.join(', ') : t('projectDetail.noTargets'),
-    updatedAt: formatDateTime(current.updatedAt),
   });
 }
 
@@ -247,30 +236,28 @@ async function toggleSkill(row: ProjectSkillControlView): Promise<void> {
   }
 }
 
-async function openProjectFolder(): Promise<void> {
-  if (openingProject.value || !detail.value) {
+watchEffect(() => {
+  if (loading.value || errorMessage.value || !detail.value) {
+    setQuickActions([]);
     return;
   }
 
-  openingProject.value = true;
-  actionMessage.value = '';
-
-  try {
-    const payload = await apiRequest<QuickOpenView>(`/api/projects/${encodeURIComponent(projectId.value)}/quick-open`, {
-      method: 'POST',
-      body: JSON.stringify({}),
-    });
-    actionMessage.value = payload.message;
-  } catch (error) {
-    if (error instanceof ApiRequestError) {
-      actionMessage.value = error.detail.message;
-    } else {
-      actionMessage.value = t('projectDetail.openFailed');
-    }
-  } finally {
-    openingProject.value = false;
-  }
-}
+  setQuickActions([
+    {
+      id: 'project-detail-back',
+      label: t('common.back'),
+      command: 'history:back/projects',
+      tone: 'ghost',
+    },
+    {
+      id: 'project-detail-open',
+      label: t('common.openProject'),
+      loadingLabel: t('common.opening'),
+      command: `project:open:${projectId.value}`,
+      tone: 'secondary',
+    },
+  ]);
+});
 
 watch(
   () => projectId.value,
@@ -291,20 +278,6 @@ onMounted(() => {
       {{ errorMessage }}
     </section>
     <template v-else-if="detail">
-      <header class="panel">
-        <p class="field-label">{{ t('projectDetail.workspaceLabel') }}</p>
-        <div class="mt-2 flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-          <div class="min-w-0">
-            <h3 class="truncate font-display text-2xl text-ink">{{ projectDisplayName }}</h3>
-            <p class="mt-1 truncate text-sm text-ink/70" :title="detail.projectPath">{{ detail.projectPath }}</p>
-            <p class="mt-2 text-sm text-ink/70">{{ projectStatusLine(detail) }}</p>
-          </div>
-          <button type="button" class="btn-secondary" :disabled="openingProject" @click="openProjectFolder">
-            {{ openingProject ? t('common.opening') : t('common.openProject') }}
-          </button>
-        </div>
-      </header>
-
       <p
         v-if="actionMessage"
         class="rounded-xl border border-copper/30 bg-copper/10 px-3 py-2 text-sm text-ink"

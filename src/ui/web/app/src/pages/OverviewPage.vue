@@ -3,7 +3,7 @@ import { computed, onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
 
 import { ApiRequestError, apiRequest } from '../lib/api';
-import { useSetQuickActions } from '../lib/chrome';
+import { useSetQuickActions, useWorkspaceSpine } from '../lib/chrome';
 import { useUiI18n } from '../lib/i18n';
 
 interface BootPayload {
@@ -51,12 +51,14 @@ const loading = ref(true);
 const errorMessage = ref('');
 const model = ref<OverviewModel | null>(null);
 
-const cwdTail = computed(() => {
-  const full = model.value?.launchCwd ?? '';
-  const normalized = full.replace(/\\/g, '/');
-  const segments = normalized.split('/').filter(Boolean);
-  return segments.at(-1) ?? full;
-});
+useWorkspaceSpine(() => ({
+  scopeLabel: model.value?.primaryScope ?? t('nav.overview'),
+  scopeDescription: errorMessage.value
+    ? errorMessage.value
+    : model.value?.matchedProjectId
+      ? `${model.value.matchedProjectLabel} · ${model.value.nextAction}`
+      : model.value?.nextAction || t('app.routeDesc.overview'),
+}));
 
 function toRecord(value: unknown): Record<string, unknown> | null {
   if (typeof value !== 'object' || value === null) {
@@ -279,40 +281,6 @@ onMounted(() => {
     </section>
 
     <template v-else-if="model">
-      <section class="panel">
-        <p class="field-label">{{ t('overview.contextPosture') }}</p>
-        <div class="mt-2 grid gap-3 lg:grid-cols-4">
-          <article class="rounded-xl border border-ink/10 bg-paper/80 p-3">
-            <p class="text-xs uppercase tracking-[0.12em] text-ink/60">{{ t('overview.launchCwd') }}</p>
-            <p class="mt-1 font-semibold text-ink" :title="model.launchCwd">{{ cwdTail || t('common.unknown') }}</p>
-          </article>
-          <article class="rounded-xl border border-ink/10 bg-paper/80 p-3">
-            <p class="text-xs uppercase tracking-[0.12em] text-ink/60">{{ t('overview.matchedState') }}</p>
-            <p class="mt-1 text-sm text-ink/80">
-              <span
-                class="mr-2 rounded-full border px-2 py-1 text-[11px] font-semibold"
-                :class="
-                  model.matchedProjectId
-                    ? 'border-emerald-700/30 bg-emerald-50 text-emerald-800'
-                    : 'border-ink/20 bg-white/75 text-ink/75'
-                "
-              >
-                {{ model.matchedProjectId ? t('common.matchedProject') : t('common.unmatched') }}
-              </span>
-              <span>{{ model.matchedProjectLabel }}</span>
-            </p>
-          </article>
-          <article class="rounded-xl border border-ink/10 bg-paper/80 p-3">
-            <p class="text-xs uppercase tracking-[0.12em] text-ink/60">{{ t('overview.primaryScope') }}</p>
-            <p class="mt-1 font-semibold text-ink">{{ model.primaryScope }}</p>
-          </article>
-          <article class="rounded-xl border border-ink/10 bg-paper/80 p-3">
-            <p class="text-xs uppercase tracking-[0.12em] text-ink/60">{{ t('overview.recommendedNextAction') }}</p>
-            <p class="mt-1 text-sm text-ink/80">{{ model.nextAction }}</p>
-          </article>
-        </div>
-      </section>
-
       <section class="panel">
         <div class="flex items-center justify-between">
           <p class="field-label">{{ t('overview.recommendedActions') }}</p>

@@ -2,7 +2,7 @@
 import { computed, onMounted, ref } from 'vue';
 
 import { ApiRequestError, apiRequest } from '../lib/api';
-import { useSetQuickActions } from '../lib/chrome';
+import { useSetQuickActions, useWorkspaceSpine } from '../lib/chrome';
 import { useUiI18n } from '../lib/i18n';
 
 interface ProjectIntersectionView {
@@ -55,6 +55,14 @@ const filteredCards = computed(() => {
     return searchBlob.includes(query);
   });
 });
+
+useWorkspaceSpine(() => ({
+  scopeLabel: t('nav.skills'),
+  scopeDescription:
+    cards.value.length > 0
+      ? t('skills.showingCount', { shown: filteredCards.value.length, total: cards.value.length })
+      : errorMessage.value || t('skills.description'),
+}));
 
 function asRecord(value: unknown): Record<string, unknown> | null {
   if (typeof value !== 'object' || value === null) {
@@ -198,12 +206,7 @@ onMounted(() => {
 <template>
   <section class="space-y-4">
     <header class="panel">
-      <p class="field-label">{{ t('skills.workspaceLabel') }}</p>
-      <div class="mt-2 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
-        <div>
-          <h3 class="font-display text-2xl text-ink">{{ t('skills.title') }}</h3>
-          <p class="mt-1 text-sm text-ink/70">{{ t('skills.description') }}</p>
-        </div>
+      <div class="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
         <p class="text-sm text-ink/70">
           {{ t('skills.showingCount', { shown: filteredCards.length, total: cards.length }) }}
         </p>
