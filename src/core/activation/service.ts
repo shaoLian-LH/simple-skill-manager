@@ -118,6 +118,7 @@ function getProjectPathForScope(context: ScopedContext): string | undefined {
 
 function createEmptyState(scope: 'project', projectPath: string): ProjectState;
 function createEmptyState(scope: 'global'): GlobalState;
+function createEmptyState(scope: ActivationScope, projectPath?: string): ScopedState;
 function createEmptyState(scope: ActivationScope, projectPath?: string): ScopedState {
   if (scope === 'project') {
     return createEmptyProjectState(requireProjectPath(projectPath));
@@ -171,6 +172,7 @@ function resolveActiveTargets(
 
 async function buildScopedContext(scope: 'project', projectPath: string): Promise<ProjectContext>;
 async function buildScopedContext(scope: 'global'): Promise<GlobalContext>;
+async function buildScopedContext(scope: ActivationScope, projectPath?: string): Promise<ScopedContext>;
 async function buildScopedContext(scope: ActivationScope, projectPath?: string): Promise<ScopedContext> {
   const { config, paths } = await loadConfig();
 
@@ -263,15 +265,15 @@ function assertEnableTargets(scope: ActivationScope, activeTargets: TargetName[]
   });
 }
 
-function buildState<TState extends ScopedState>(
+function buildState(
   context: ScopedContext,
-  previousState: TState,
+  previousState: ScopedState,
   activeTargets: TargetName[],
   enabledSkills: string[],
   enabledPresets: string[],
   resolvedSkills: Map<string, SkillDefinition>,
   updatedAt = nowIso(),
-): TState {
+): ScopedState {
   const skillNames = uniqueSorted(resolvedSkills.keys());
   const nextTargets: ActivationState['targets'] = {};
 
@@ -315,14 +317,15 @@ function buildState<TState extends ScopedState>(
     return {
       ...baseState,
       projectPath: context.projectPath,
-    } as TState;
+    };
   }
 
-  return baseState as TState;
+  return baseState;
 }
 
 async function saveScopedState(context: ProjectContext, state: ProjectState): Promise<void>;
 async function saveScopedState(context: GlobalContext, state: GlobalState): Promise<void>;
+async function saveScopedState(context: ScopedContext, state: ScopedState): Promise<void>;
 async function saveScopedState(context: ScopedContext, state: ScopedState): Promise<void> {
   if (context.scope === 'project') {
     await saveProjectState(context.projectPath, state as ProjectState);
@@ -344,7 +347,7 @@ async function removeScopedState(context: ScopedContext): Promise<void> {
 
 async function restorePreviousState(context: ScopedContext, previousIndexEntry: ProjectIndexEntry | undefined): Promise<void> {
   if (context.hadPreviousState) {
-    await saveScopedState(context as never, context.previousState as never);
+    await saveScopedState(context, context.previousState);
   } else {
     await removeScopedState(context);
   }
@@ -452,64 +455,114 @@ async function removeObsoleteInstalls(
   }
 }
 
-async function reconcileState<TState extends ScopedState>(
+async function reconcileState(
+  context: ProjectContext,
+  nextState: ProjectState,
+  resolvedSkills: Map<string, SkillDefinition>,
+  options?: { ensureGitignore?: boolean },
+): Promise<ProjectState>;
+async function reconcileState(
+  context: GlobalContext,
+  nextState: GlobalState,
+  resolvedSkills: Map<string, SkillDefinition>,
+  options?: { ensureGitignore?: boolean },
+): Promise<GlobalState>;
+async function reconcileState(
   context: ScopedContext,
-  nextState: TState,
+  nextState: ScopedState,
+  resolvedSkills: Map<string, SkillDefinition>,
+  options?: { ensureGitignore?: boolean },
+): Promise<ScopedState>;
+async function reconcileState(
+  context: ScopedContext,
+  nextState: ScopedState,
   resolvedSkills: Map<string, SkillDefinition>,
   options: { ensureGitignore?: boolean } = {},
-): Promise<TState> {
-  const previousIndex =
-    context.scope === 'project'
-      ? await loadProjectsIndex(context.paths.projectsFile)
-      : null;
-  const previousIndexEntry = context.scope === 'project' ? previousIndex?.projects[context.projectPath] : undefined;
-
-  if (options.ensureGitignore && context.scope === 'project') {
-    await ensureProjectGitignore(context.projectPath);
-  }
-
+): Promise<ScopedState> {
   if (context.scope === 'project') {
+    const projectNextState = nextState as ProjectState;
+    const previousIndex = await loadProjectsIndex(context.paths.projectsFile);
+    const previousIndexEntry = previousIndex.projects[context.projectPath];
+
+    if (options.ensureGitignore) {
+      await ensureProjectGitignore(context.projectPath);
+    }
     await ensureProjectStateDir(context.projectPath);
+
+    const installSkills = await prepareInstallSkills(context, projectNextState, resolvedSkills);
+    const installOptions: ManagedInstallBatchOptions = {
+      projectPath: context.projectPath,
+      skills: installSkills,
+      resolveInstallPlan: createInstallPlanResolver('project', context.projectPath, installSkills),
+    };
+
+    await preflightInstallConflicts('project', projectNextState, context.previousState, installOptions);
+    await saveScopedState(context, projectNextState);
+
+    const installChanges = await backupChangedManagedPaths('project', projectNextState, context.previousState, installOptions);
+
+    try {
+      await removeObsoleteInstalls(context, context.previousState, projectNextState, installOptions);
+      const installedState = await applyManagedInstalls('project', projectNextState, context.previousState, installOptions);
+      installedState.updatedAt = nowIso();
+      await saveScopedState(context, installedState);
+
+      const nextIndex = mirrorProjectState(previousIndex, installedState);
+      await saveProjectsIndex(context.paths.projectsFile, nextIndex);
+
+      await commitInstallChanges(installChanges);
+      return installedState;
+    } catch (error) {
+      await restoreInstallChanges(installChanges);
+      try {
+        const rollbackState = createEmptyState('project', context.projectPath);
+        await applyManagedInstalls('project', context.previousState, rollbackState, installOptions);
+      } catch {
+        // best-effort rollback
+      }
+      await restorePreviousState(context, previousIndexEntry);
+
+      throw new SkmError('runtime', 'Failed to reconcile project state.', {
+        details: error instanceof Error ? error.message : undefined,
+        hint: 'Fix the reported issue and run `skm sync` to restore the state.',
+        cause: error,
+      });
+    }
   }
 
-  const installSkills = await prepareInstallSkills(context, nextState, resolvedSkills);
+  const globalNextState = nextState as GlobalState;
+  const installSkills = await prepareInstallSkills(context, globalNextState, resolvedSkills);
   const installOptions: ManagedInstallBatchOptions = {
-    projectPath: getProjectPathForScope(context),
     skills: installSkills,
-    resolveInstallPlan: createInstallPlanResolver(context.scope, getProjectPathForScope(context), installSkills),
+    resolveInstallPlan: createInstallPlanResolver('global', undefined, installSkills),
   };
 
-  await preflightInstallConflicts(context.scope, nextState, context.previousState, installOptions);
-  await saveScopedState(context as never, nextState as never);
+  await preflightInstallConflicts('global', globalNextState, context.previousState, installOptions);
+  await saveScopedState(context, globalNextState);
 
-  const installChanges = await backupChangedManagedPaths(context.scope, nextState, context.previousState, installOptions);
+  const installChanges = await backupChangedManagedPaths('global', globalNextState, context.previousState, installOptions);
 
   try {
-    await removeObsoleteInstalls(context, context.previousState, nextState, installOptions);
-    const installedState = await applyManagedInstalls(context.scope, nextState, context.previousState, installOptions);
+    await removeObsoleteInstalls(context, context.previousState, globalNextState, installOptions);
+    const installedState = await applyManagedInstalls('global', globalNextState, context.previousState, installOptions);
     installedState.updatedAt = nowIso();
-    await saveScopedState(context as never, installedState as never);
-
-    if (context.scope === 'project' && previousIndex) {
-      const nextIndex = mirrorProjectState(previousIndex, installedState as ProjectState);
-      await saveProjectsIndex(context.paths.projectsFile, nextIndex);
-    }
+    await saveScopedState(context, installedState);
 
     await commitInstallChanges(installChanges);
     return installedState;
   } catch (error) {
     await restoreInstallChanges(installChanges);
     try {
-      const rollbackState = createEmptyState(context.scope, getProjectPathForScope(context));
-      await applyManagedInstalls(context.scope, context.previousState, rollbackState as typeof context.previousState, installOptions);
+      const rollbackState = createEmptyState('global');
+      await applyManagedInstalls('global', context.previousState, rollbackState, installOptions);
     } catch {
       // best-effort rollback
     }
-    await restorePreviousState(context, previousIndexEntry);
+    await restorePreviousState(context, undefined);
 
-    throw new SkmError('runtime', `Failed to reconcile ${context.scope} state.`, {
+    throw new SkmError('runtime', 'Failed to reconcile global state.', {
       details: error instanceof Error ? error.message : undefined,
-      hint: `Fix the reported issue and run \`skm sync${context.scope === 'global' ? ' --global' : ''}\` to restore the state.`,
+      hint: 'Fix the reported issue and run `skm sync --global` to restore the state.',
       cause: error,
     });
   }

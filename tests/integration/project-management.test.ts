@@ -298,7 +298,7 @@ describe('project activation and maintenance', () => {
         env: { HOME: homeDir },
       });
 
-      let globalState = (await readGlobalState(homeDir)) as {
+      const enabledGlobalState = (await readGlobalState(homeDir)) as {
         enabledSkills: string[];
         enabledPresets: string[];
         targets: Record<string, { skills: Record<string, { installMode: string; sourcePath: string }> }>;
@@ -307,9 +307,9 @@ describe('project activation and maintenance', () => {
       const installStats = await fs.lstat(installPath);
       const projectsIndex = (await readProjectsIndex(homeDir)) as { projects: Record<string, unknown> };
 
-      expect(globalState.enabledSkills).toEqual(['brainstorming']);
-      expect(globalState.enabledPresets).toEqual([]);
-      expect(globalState.targets['.agents']?.skills.brainstorming).toMatchObject({
+      expect(enabledGlobalState.enabledSkills).toEqual(['brainstorming']);
+      expect(enabledGlobalState.enabledPresets).toEqual([]);
+      expect(enabledGlobalState.targets['.agents']?.skills.brainstorming).toMatchObject({
         installMode: expect.stringMatching(/^(symlink|copy)$/),
         sourcePath: path.join(skillsDir, 'brainstorming'),
       });
@@ -320,14 +320,14 @@ describe('project activation and maintenance', () => {
         env: { HOME: homeDir },
       });
 
-      globalState = (await readGlobalState(homeDir)) as {
+      const disabledGlobalState = (await readGlobalState(homeDir)) as {
         enabledSkills: string[];
         enabledPresets: string[];
         targets: Record<string, unknown>;
       };
-      expect(globalState.enabledSkills).toEqual([]);
-      expect(globalState.enabledPresets).toEqual([]);
-      expect(globalState.targets).toEqual({});
+      expect(disabledGlobalState.enabledSkills).toEqual([]);
+      expect(disabledGlobalState.enabledPresets).toEqual([]);
+      expect(disabledGlobalState.targets).toEqual({});
       await expect(fs.access(installPath)).rejects.toThrow();
     });
   });

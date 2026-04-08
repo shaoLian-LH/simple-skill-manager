@@ -1,5 +1,7 @@
 # simple-skill-manager
 
+中文版本：`README.zh-CN.md`
+
 `simple-skill-manager` (`skm`) is a Node.js CLI for managing local skill visibility and linking selected skills into project or global targets such as `.agents`, `.trae`, `.kiro`, `.claude`, and `.gemini`.
 
 It does not execute skills. It manages:
@@ -17,12 +19,20 @@ It does not execute skills. It manages:
 ## Install for local development
 
 ```bash
-npm install
-npm run build
+pnpm install
+pnpm run build
 node dist/skm.js --help
 ```
 
 The packaged CLI entry is exposed through `package.json#bin` as `skm`.
+
+Expose the local package as a global CLI during development:
+
+```bash
+pnpm run link:global
+skm --help
+pnpm run unlink:global
+```
 
 ## Initial setup
 
@@ -187,7 +197,16 @@ Install rules:
 ## Development
 
 ```bash
-npm run check
-npm run build
+pnpm run check
+pnpm run build
 node dist/skm.js --help
 ```
+
+## Publish workflow
+
+```bash
+pnpm run publish:verify
+pnpm publish --dry-run
+```
+
+`pnpm publish` automatically runs `prepublishOnly`, which calls `pnpm run publish:verify` to execute tests, type checks, and build before publishing.

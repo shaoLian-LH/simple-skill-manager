@@ -97,7 +97,7 @@ function resolveManagedInstallPlan(
   input: ManagedInstallPlanResolverInput,
   resolver?: ManagedInstallPlanResolver,
 ): ManagedInstallPlan {
-  const fallbackPlan =
+  const fallbackPlan: ManagedInstallPlan =
     input.scope === 'project'
       ? createDefaultInstallPlan(input.projectPath ?? '', input.target, input.skillName)
       : {
