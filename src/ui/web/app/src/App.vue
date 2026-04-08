@@ -2,77 +2,126 @@
 import { computed, nextTick, onMounted, provide, ref, watch } from 'vue';
 import { RouterLink, RouterView, useRoute } from 'vue-router';
 
-import { apiRequest, ApiRequestError } from './lib/api';
-import { quickActionsKey, launchStatusKey } from './lib/chrome';
+import { ApiRequestError, apiRequest } from './lib/api';
+import { bootViewKey, launchStatusKey, quickActionsKey, workspaceSpineKey } from './lib/chrome';
+import { useUiI18n } from './lib/i18n';
 import { animateRouteSwap } from './lib/motion';
-import type { BootView, LaunchStatusView, QuickActionView } from './types';
+import type { BootView, LaunchStatusView, QuickActionView, WorkspaceSpineView } from './types';
 
 const route = useRoute();
-const quickActions = ref<QuickActionView[]>([]);
-const quickActionsOpen = ref(false);
-const launchStatus = ref<LaunchStatusView | null>(null);
+const { locale, t, withLocalePath } = useUiI18n();
 const stageRef = ref<HTMLElement | null>(null);
-const toast = ref<string>('');
+const bootView = ref<BootView | null>(null);
+const launchStatus = ref<LaunchStatusView | null>(null);
+const workspaceSpine = ref<WorkspaceSpineView | null>(null);
+const quickActions = ref<QuickActionView[]>([]);
+const toast = ref('');
 
+provide(bootViewKey, bootView);
+provide(launchStatusKey, launchStatus);
+provide(workspaceSpineKey, (value: WorkspaceSpineView | null) => {
+  workspaceSpine.value = value;
+});
 provide(quickActionsKey, (actions: QuickActionView[]) => {
   quickActions.value = actions;
 });
-provide(launchStatusKey, launchStatus);
 
-const routeTitle = computed(() => {
-  if (route.path.startsWith('/projects/')) return 'Project Detail';
-  if (route.path === '/projects') return 'Projects';
-  if (route.path === '/presets') return 'Presets';
-  if (route.path === '/config') return 'Global Config';
-  if (route.path === '/dashboard' || route.path === '/') return 'Dashboard';
-  return 'Not Found';
-});
+const navigationItems = [
+  { labelKey: 'nav.overview', to: '/overview', navKey: 'overview' },
+  { labelKey: 'nav.projects', to: '/projects', navKey: 'projects' },
+  { labelKey: 'nav.skills', to: '/skills', navKey: 'skills' },
+  { labelKey: 'nav.presets', to: '/presets', navKey: 'presets' },
+  { labelKey: 'nav.config', to: '/config', navKey: 'config' },
+] as const;
 
+const activeNavKey = computed(() => String(route.meta.navKey ?? ''));
+const routeTitle = computed(() => t(String(route.meta.titleKey ?? 'route.workbench')));
 const routeDescription = computed(() => {
-  if (route.path.startsWith('/projects/')) {
-    return 'Adjust direct skills and presets, then verify the resolved outcome panel.';
+  switch (activeNavKey.value) {
+    case 'overview':
+      return t('app.routeDesc.overview');
+    case 'projects':
+      return route.path.startsWith('/projects/')
+        ? t('app.routeDesc.projectDetail')
+        : t('app.routeDesc.projects');
+    case 'skills':
+      return t('app.routeDesc.skills');
+    case 'presets':
+      return route.path.startsWith('/presets/')
+        ? t('app.routeDesc.presetDetail')
+        : t('app.routeDesc.presets');
+    case 'config':
+      return t('app.routeDesc.config');
+    default:
+      return t('app.routeDesc.fallback');
   }
-  if (route.path === '/projects') {
-    return 'Search and scan tracked projects, then jump directly into a detail workspace.';
-  }
-  if (route.path === '/presets') {
-    return 'Maintain reusable preset bundles while keeping visibility on project impact.';
-  }
-  if (route.path === '/config') {
-    return 'Tune global workspace defaults with focused form controls and inline validation.';
-  }
-  return 'Start work immediately with quick access to recent projects and contextual actions.';
 });
 
-function copyCommand(command: string): void {
-  void navigator.clipboard
-    .writeText(command)
-    .then(() => {
-      toast.value = `Copied: ${command}`;
-      window.setTimeout(() => {
-        toast.value = '';
-      }, 1800);
-    })
-    .catch(() => undefined);
+const launchFolderName = computed(() => {
+  const launchCwd = bootView.value?.launchCwd ?? '';
+  if (!launchCwd) return t('common.unknown');
+  const normalized = launchCwd.replace(/\\/g, '/').replace(/\/+$/, '');
+  const segments = normalized.split('/').filter(Boolean);
+  return segments.at(-1) ?? launchCwd;
+});
+
+const runtimeLine = computed(() => {
+  if (!launchStatus.value) return t('app.checkingRuntime');
+  return launchStatus.value.usedPortFallback
+    ? t('app.runningRuntimeFallback', { port: launchStatus.value.port })
+    : t('app.runningRuntime', { port: launchStatus.value.port });
+});
+
+function showToast(message: string): void {
+  toast.value = message;
+  window.setTimeout(() => {
+    if (toast.value === message) {
+      toast.value = '';
+    }
+  }, 2200);
+}
+
+async function refreshBootContext(): Promise<void> {
+  try {
+    const boot = await apiRequest<BootView>('/api/boot');
+    bootView.value = boot;
+    launchStatus.value = boot.launchStatus;
+  } catch (error) {
+    if (error instanceof ApiRequestError) {
+      showToast(error.detail.message);
+      return;
+    }
+    showToast(t('app.loadLaunchContextFailed'));
+  }
 }
 
 async function refreshLaunchStatus(): Promise<void> {
   try {
     launchStatus.value = await apiRequest<LaunchStatusView>('/api/launch-status');
+  } catch {
+    launchStatus.value = null;
+  }
+}
+
+async function openLaunchCwd(): Promise<void> {
+  try {
+    const result = await apiRequest<{ message: string }>('/api/launch-cwd/open', {
+      method: 'POST',
+      body: JSON.stringify({}),
+    });
+    showToast(result.message);
   } catch (error) {
     if (error instanceof ApiRequestError) {
-      toast.value = error.detail.message;
+      showToast(error.detail.message);
       return;
     }
-    toast.value = 'Unable to load launch status.';
+    showToast(t('app.openLaunchFolderFailed'));
   }
 }
 
 onMounted(async () => {
-  try {
-    const boot = await apiRequest<BootView>('/api/boot');
-    launchStatus.value = boot.launchStatus;
-  } catch {
+  await refreshBootContext();
+  if (!launchStatus.value) {
     await refreshLaunchStatus();
   }
 });
@@ -81,7 +130,6 @@ watch(
   () => route.fullPath,
   async () => {
     quickActions.value = [];
-    quickActionsOpen.value = false;
     await nextTick();
     if (stageRef.value) {
       animateRouteSwap(stageRef.value);
@@ -89,82 +137,99 @@ watch(
   },
   { immediate: true },
 );
+
+watch(
+  () => [route.meta.titleKey, locale.value] as const,
+  () => {
+    document.documentElement.lang = locale.value;
+    document.title = `${routeTitle.value} · simple-skill-manager`;
+  },
+  { immediate: true },
+);
 </script>
 
 <template>
   <div class="app-bg min-h-screen p-4 md:p-6">
-    <div class="mx-auto grid max-w-[1500px] gap-4 md:grid-cols-[260px_minmax(0,1fr)]">
-      <aside
-        class="animate__animated animate__fadeInLeft workbench-shell flex flex-col justify-between rounded-[28px] border border-ink/10 bg-paper/90 p-4 shadow-workbench"
-      >
-        <div class="space-y-5">
-          <div class="grid grid-cols-[58px_minmax(0,1fr)] gap-3">
-            <div class="grid h-[58px] w-[58px] place-items-center rounded-2xl bg-copper text-xl font-display text-white">SKM</div>
-            <div>
-              <p class="text-xs font-semibold uppercase tracking-[0.16em] text-copper">Warm Workbench</p>
-              <h1 class="font-display text-xl text-ink">simple-skill-manager</h1>
-              <p class="text-sm text-ink/70">Operate projects, presets, and config without losing context.</p>
-            </div>
+    <div class="mx-auto grid max-w-[1680px] gap-4 xl:grid-cols-[220px_minmax(0,1fr)_320px]">
+      <aside class="workbench-shell nav-shell">
+        <div class="space-y-6">
+          <div>
+            <p class="brand-tag">{{ t('app.brandTag') }}</p>
+            <h1 class="brand-title">simple-skill-manager</h1>
+            <p class="brand-note">{{ t('app.brandNote') }}</p>
           </div>
 
           <nav class="space-y-2 text-sm">
-            <RouterLink to="/dashboard" class="nav-link" :class="{ active: route.path === '/dashboard' || route.path === '/' }">Dashboard</RouterLink>
-            <RouterLink to="/projects" class="nav-link" :class="{ active: route.path === '/projects' }">Projects</RouterLink>
-            <RouterLink to="/presets" class="nav-link" :class="{ active: route.path === '/presets' }">Presets</RouterLink>
-            <RouterLink to="/config" class="nav-link" :class="{ active: route.path === '/config' }">Global Config</RouterLink>
+            <RouterLink
+              v-for="item in navigationItems"
+              :key="item.to"
+              :to="withLocalePath(item.to)"
+              class="nav-link"
+              :class="{ active: activeNavKey === item.navKey }"
+            >
+              {{ t(item.labelKey) }}
+            </RouterLink>
           </nav>
         </div>
-
-        <section class="rounded-2xl border border-ink/10 bg-white/60 p-3 text-xs text-ink/80">
-          <p class="font-semibold uppercase tracking-[0.16em] text-copper">Launch Status</p>
-          <p class="mt-1 break-all">{{ launchStatus?.url ?? 'Loading...' }}</p>
-          <p class="mt-1">
-            Port:
-            <span class="font-semibold text-ink">{{ launchStatus?.port ?? '-' }}</span>
-            <span v-if="launchStatus?.usedPortFallback" class="ml-1 text-copper">(fallback)</span>
-          </p>
-        </section>
       </aside>
 
-      <main ref="stageRef" class="animate__animated animate__fadeInUp workbench-shell rounded-[28px] border border-ink/10 bg-paper/90 p-4 shadow-workbench">
-        <header class="flex items-start justify-between gap-4 border-b border-ink/10 pb-4">
-          <div class="space-y-1">
-            <p class="text-xs font-semibold uppercase tracking-[0.16em] text-copper">Route Header</p>
-            <h2 class="font-display text-3xl text-ink">{{ routeTitle }}</h2>
-            <p class="max-w-3xl text-sm text-ink/70">{{ routeDescription }}</p>
-          </div>
-          <button type="button" class="btn-secondary" @click="quickActionsOpen = !quickActionsOpen">
-            Quick Actions
-          </button>
+      <main ref="stageRef" class="workbench-shell workspace-shell">
+        <header class="workspace-header">
+          <p class="field-label">{{ t('app.workspace') }}</p>
+          <h2 class="workspace-title">{{ routeTitle }}</h2>
+          <p class="workspace-desc">{{ routeDescription }}</p>
+        </header>
+        <section class="workspace-body">
+          <RouterView />
+        </section>
+      </main>
+
+      <aside class="workbench-shell spine-shell">
+        <header class="spine-header">
+          <p class="field-label">{{ t('app.contextRuntime') }}</p>
+          <h3 class="spine-title">{{ t('app.currentSession') }}</h3>
         </header>
 
-        <section v-if="quickActionsOpen" class="mt-4 rounded-2xl border border-copper/25 bg-white/75 p-3">
-          <p class="text-xs font-semibold uppercase tracking-[0.16em] text-copper">Context Actions</p>
-          <p class="mt-1 text-xs text-ink/70">These actions explain the equivalent CLI commands for the current page.</p>
-          <ul class="mt-3 space-y-2">
-            <li v-for="action in quickActions" :key="action.id" class="rounded-xl border border-ink/10 bg-paper/70 p-3">
-              <div class="flex items-start justify-between gap-3">
-                <div>
-                  <p class="text-sm font-semibold text-ink">{{ action.label }}</p>
-                  <code class="mt-1 block text-xs text-ink/80">{{ action.command }}</code>
-                </div>
-                <button type="button" class="btn-ghost" @click="copyCommand(action.command)">Copy</button>
-              </div>
-            </li>
-            <li v-if="quickActions.length === 0" class="rounded-xl border border-dashed border-ink/20 p-3 text-sm text-ink/65">
-              No route-scoped quick actions are available yet.
-            </li>
-          </ul>
+        <section class="spine-group">
+          <p class="spine-label">{{ t('app.launchCwd') }}</p>
+          <p class="spine-value" :title="bootView?.launchCwd || t('common.unknownPath')">{{ launchFolderName }}</p>
+          <div class="spine-row">
+            <button v-if="bootView?.launchCwd" type="button" class="inline-link bg-transparent p-0" @click="openLaunchCwd">
+              {{ t('common.openFolder') }}
+            </button>
+            <span v-else class="spine-hint">{{ t('app.folderPathUnavailable') }}</span>
+          </div>
         </section>
 
-        <div class="mt-4">
-          <RouterView />
-        </div>
-      </main>
+        <section class="spine-group">
+          <p class="spine-label">{{ t('app.projectMatch') }}</p>
+          <div class="spine-row">
+            <span class="status-pill" :class="bootView?.matchedProjectId ? 'status-pill-match' : 'status-pill-off'">
+              {{ bootView?.matchedProjectId ? t('common.matchedProject') : t('common.noMatch') }}
+            </span>
+          </div>
+          <p v-if="bootView?.matchedProjectName" class="spine-hint">{{ bootView.matchedProjectName }}</p>
+        </section>
+
+        <section class="spine-group">
+          <p class="spine-label">{{ t('app.scopeTargets') }}</p>
+          <p class="spine-value">{{ workspaceSpine?.scopeLabel ?? t('app.contextAwareWorkbench') }}</p>
+          <p class="spine-hint">
+            {{ workspaceSpine?.scopeDescription ?? t('app.routeDesc.fallback') }}
+          </p>
+          <p v-if="workspaceSpine?.targets?.length" class="spine-hint">
+            {{ t('app.targets', { targets: workspaceSpine.targets.join(', ') }) }}
+          </p>
+        </section>
+
+        <section class="spine-group">
+          <p class="spine-label">{{ t('app.runtime') }}</p>
+          <p class="spine-value">{{ runtimeLine }}</p>
+          <p class="spine-hint">{{ launchStatus?.url ?? t('app.waitingRuntimeStatus') }}</p>
+        </section>
+      </aside>
     </div>
 
-    <div v-if="toast" class="fixed bottom-4 right-4 rounded-xl border border-copper/25 bg-white px-3 py-2 text-sm text-ink shadow-workbench">
-      {{ toast }}
-    </div>
+    <div v-if="toast" class="toast">{{ toast }}</div>
   </div>
 </template>

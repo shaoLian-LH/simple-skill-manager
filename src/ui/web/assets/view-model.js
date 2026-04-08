@@ -1,3 +1,9 @@
+import {
+  DEFAULT_UI_LOCALE,
+  formatUiRelativeTime,
+  translateUiText,
+} from '../../text.js';
+
 export function parseRoute(pathname) {
   if (pathname === '/' || pathname === '/dashboard') {
     return { name: 'dashboard' };
@@ -71,9 +77,9 @@ export function filterProjects(projects, searchQuery) {
   });
 }
 
-export function getProjectLabel(projectPath) {
+export function getProjectLabel(projectPath, locale = DEFAULT_UI_LOCALE) {
   if (typeof projectPath !== 'string' || projectPath.length === 0) {
-    return 'Untitled project';
+    return translateUiText(locale, 'common.untitledProject');
   }
 
   const normalized = projectPath.replace(/\\/g, '/').replace(/\/+$/, '');
@@ -81,67 +87,32 @@ export function getProjectLabel(projectPath) {
   return segments.at(-1) ?? projectPath;
 }
 
-export function formatRelativeTime(value, now = Date.now()) {
-  if (!value) {
-    return 'Unknown';
-  }
-
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) {
-    return String(value);
-  }
-
-  const diffMs = now - parsed.getTime();
-  const future = diffMs < 0;
-  const absMs = Math.abs(diffMs);
-  const minute = 60 * 1000;
-  const hour = 60 * minute;
-  const day = 24 * hour;
-
-  if (absMs < minute) {
-    return future ? 'in under a minute' : 'just now';
-  }
-
-  if (absMs < hour) {
-    const minutes = Math.round(absMs / minute);
-    return future ? `in ${minutes}m` : `${minutes}m ago`;
-  }
-
-  if (absMs < day) {
-    const hours = Math.round(absMs / hour);
-    return future ? `in ${hours}h` : `${hours}h ago`;
-  }
-
-  const days = Math.round(absMs / day);
-  if (days === 1) {
-    return future ? 'tomorrow' : 'yesterday';
-  }
-
-  return future ? `in ${days}d` : `${days}d ago`;
+export function formatRelativeTime(value, now = Date.now(), locale = DEFAULT_UI_LOCALE) {
+  return formatUiRelativeTime(locale, value, now);
 }
 
-export function formatRouteTitle(route) {
+export function formatRouteTitle(route, locale = DEFAULT_UI_LOCALE) {
   if (route.name === 'dashboard') {
-    return 'Dashboard';
+    return translateUiText(locale, 'route.overview');
   }
 
   if (route.name === 'projects') {
-    return 'Projects';
+    return translateUiText(locale, 'route.projects');
   }
 
   if (route.name === 'project-detail') {
-    return 'Project Detail';
+    return translateUiText(locale, 'route.projectDetail');
   }
 
   if (route.name === 'presets') {
-    return 'Presets';
+    return translateUiText(locale, 'route.presets');
   }
 
   if (route.name === 'config') {
-    return 'Global Config';
+    return translateUiText(locale, 'route.config');
   }
 
-  return 'Not Found';
+  return translateUiText(locale, 'route.notFound');
 }
 
 export function pickQuickActions({ route, dashboard, projectsQuickActions, projectDetail, presets, config }) {
@@ -168,36 +139,31 @@ export function pickQuickActions({ route, dashboard, projectsQuickActions, proje
   return [];
 }
 
-export function buildPresetDeleteConfirmationMessage(preview) {
+export function buildPresetDeleteConfirmationMessage(preview, locale = DEFAULT_UI_LOCALE) {
   if (!preview || typeof preview !== 'object') {
-    return 'Delete this preset?';
+    return translateUiText(locale, 'presetDetail.deleteConfirmEmpty', { name: 'preset' });
   }
 
-  const name = typeof preview.name === 'string' ? preview.name : 'this preset';
+  const name = typeof preview.name === 'string' ? preview.name : 'preset';
   if (preview.readonly === true) {
-    return `Preset ${name} is dynamic and read-only. Delete the scope directory instead.`;
+    return translateUiText(locale, 'presetDetail.readonlyDeleteBlocked', { name });
   }
 
   const referenceCount = typeof preview.referenceCount === 'number' ? preview.referenceCount : 0;
   if (referenceCount <= 0) {
-    return `Delete preset ${name}?`;
+    return translateUiText(locale, 'presetDetail.deleteConfirmEmpty', { name });
   }
 
   const referenceLines = Array.isArray(preview.referenceProjects)
     ? preview.referenceProjects
         .slice(0, 5)
-        .map((project) => (typeof project?.projectPath === 'string' ? `- ${project.projectPath}` : '- (unknown project)'))
+        .map((project) => (typeof project?.projectPath === 'string' ? `- ${project.projectPath}` : `- ${translateUiText(locale, 'common.unknownProject')}`))
     : [];
 
   const suffix = preview.referenceCount > 5 ? '\n- ...' : '';
-  return [
-    `Preset ${name} is currently shaping ${referenceCount} project(s).`,
-    '',
-    ...referenceLines,
-    suffix,
-    '',
-    `Delete preset ${name} anyway?`,
-  ]
-    .filter((line) => line !== '')
-    .join('\n');
+  return translateUiText(locale, 'presetDetail.deleteConfirmWithRefs', {
+    name,
+    count: referenceCount,
+    projects: [...referenceLines, suffix].filter(Boolean).join('\n'),
+  });
 }

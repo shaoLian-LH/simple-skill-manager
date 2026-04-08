@@ -29,17 +29,76 @@ export interface LaunchStatusView {
   browserError?: string;
 }
 
-export interface BootView {
-  initialRoute: string;
-  launchCwd: string;
-  matchedProjectId: string | null;
-  launchStatus: LaunchStatusView;
-}
-
 export interface QuickActionView {
   id: string;
   label: string;
   command: string;
+}
+
+export interface ProjectReferenceView {
+  projectId: string;
+  projectPath: string;
+  displayName: string;
+}
+
+export interface ProjectSummaryView extends ProjectReferenceView {
+  targets: TargetName[];
+  enabledSkillCount: number;
+  enabledPresetCount: number;
+  updatedAt: string;
+}
+
+export interface MatchedProjectView extends ProjectSummaryView {
+  matched: true;
+}
+
+export interface BootView {
+  initialRoute: string;
+  launchCwd: string;
+  matchedProjectId: string | null;
+  matchedProjectName: string | null;
+  launchStatus: LaunchStatusView;
+}
+
+export interface ScopeSummaryView {
+  kind: 'project' | 'global';
+  label: string;
+  description: string;
+}
+
+export interface RecommendedActionView {
+  id: string;
+  label: string;
+  description: string;
+  to: string;
+  emphasis: 'primary' | 'secondary';
+}
+
+export interface RelationshipSummaryItemView {
+  id: string;
+  sentence: string;
+  emphasis?: string;
+}
+
+export interface RelationshipSummaryView {
+  heading: string;
+  items: RelationshipSummaryItemView[];
+}
+
+export interface OverviewView {
+  launchCwd: string;
+  matchedProject: MatchedProjectView | null;
+  primaryScope: ScopeSummaryView;
+  recommendedActions: RecommendedActionView[];
+  relationshipSummary: RelationshipSummaryView;
+  totals: {
+    projects: number;
+    presets: number;
+    skills: number;
+    globalEnabledSkills: number;
+    globalEnabledPresets: number;
+  };
+  recentProjects: ProjectSummaryView[];
 }
 
 export interface DashboardView {
@@ -62,15 +121,11 @@ export interface ConfigView {
     presetsFile: string;
     projectsFile: string;
   };
-}
-
-export interface ProjectSummaryView {
-  projectId: string;
-  projectPath: string;
-  targets: TargetName[];
-  enabledSkillCount: number;
-  enabledPresetCount: number;
-  updatedAt: string;
+  folderPicker: {
+    supported: boolean;
+    mode: 'host' | 'manual-only';
+    reason?: string;
+  };
 }
 
 export interface EnabledPresetView {
@@ -80,20 +135,54 @@ export interface EnabledPresetView {
   readonly: boolean;
 }
 
+export interface ResolvedSkillSourceView {
+  kind: 'direct' | 'preset';
+  label: string;
+  presetName?: string;
+}
+
 export interface ResolvedSkillView {
   name: string;
   sourceLabels: string[];
   direct: boolean;
   viaPresets: string[];
+  sources: ResolvedSkillSourceView[];
 }
 
-export interface ProjectDetailView {
-  projectId: string;
-  projectPath: string;
+export interface ProjectPresetControlView {
+  name: string;
+  skills: string[];
+  source: PresetSource;
+  readonly: boolean;
+  enabled: boolean;
+  editable: boolean;
+  reason?: string;
+}
+
+export interface ProjectSkillControlView {
+  name: string;
+  description: string;
+  path: string;
+  enabled: boolean;
+  editable: boolean;
+  direct: boolean;
+  viaPresets: string[];
+  reason?: string;
+}
+
+export interface ProjectDetailView extends ProjectReferenceView {
   targets: TargetName[];
   updatedAt: string;
   enabledPresets: EnabledPresetView[];
   enabledSkills: string[];
+  presetControls: {
+    enabled: ProjectPresetControlView[];
+    available: ProjectPresetControlView[];
+  };
+  skillControls: {
+    enabled: ProjectSkillControlView[];
+    available: ProjectSkillControlView[];
+  };
   resolvedSkills: ResolvedSkillView[];
   quickActions: QuickActionView[];
 }
@@ -118,18 +207,45 @@ export interface PresetDeletePreviewView {
   referenceCount: number;
   source: PresetSource;
   readonly: boolean;
-  referenceProjects: Array<{
-    projectId: string;
-    projectPath: string;
-  }>;
+  referenceProjects: ProjectReferenceView[];
+}
+
+export interface SkillIntersectionProjectView extends ProjectReferenceView {
+  viaPresetNames?: string[];
+}
+
+export interface SkillItemView {
+  name: string;
+  description: string;
+  path: string;
+  globalEnabled: boolean;
+  updatedAt?: string;
+  directProjects: SkillIntersectionProjectView[];
+  viaPresetProjects: SkillIntersectionProjectView[];
 }
 
 export interface SkillsView {
-  items: Array<{
-    name: string;
-    description: string;
-    path: string;
-  }>;
+  items: SkillItemView[];
+}
+
+export interface PresetSkillMembershipView {
+  name: string;
+  description: string;
+  path: string;
+  included: boolean;
+  editable: boolean;
+  reason?: string;
+}
+
+export interface PresetDetailView {
+  name: string;
+  source: PresetSource;
+  readonly: boolean;
+  skillCount: number;
+  referenceCount: number;
+  includedSkills: string[];
+  availableSkills: PresetSkillMembershipView[];
+  affectedProjects: ProjectReferenceView[];
 }
 
 export interface PresetDeleteView {

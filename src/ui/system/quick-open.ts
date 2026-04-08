@@ -1,6 +1,7 @@
 import { spawn } from 'node:child_process';
 
 import type { QuickOpenView } from '../contracts/api.js';
+import { DEFAULT_UI_LOCALE, translateUiText, type UiLocale } from '../text.js';
 
 export type RunSystemCommand = (command: string, args: string[]) => Promise<void>;
 
@@ -42,13 +43,17 @@ async function openWithDefaultSystemHandler(projectPath: string, runner: RunSyst
   await runner('xdg-open', [projectPath]);
 }
 
-export async function quickOpenProjectPath(projectPath: string, runner: RunSystemCommand = runSystemCommand): Promise<QuickOpenView> {
+export async function quickOpenProjectPath(
+  projectPath: string,
+  runner: RunSystemCommand = runSystemCommand,
+  locale: UiLocale = DEFAULT_UI_LOCALE,
+): Promise<QuickOpenView> {
   try {
     await runner('code', [projectPath]);
     return {
       success: true,
       strategy: 'code',
-      message: 'Opened the project in VS Code.',
+      message: translateUiText(locale, 'quickOpen.openedInCode'),
     };
   } catch (codeError) {
     try {
@@ -56,13 +61,16 @@ export async function quickOpenProjectPath(projectPath: string, runner: RunSyste
       return {
         success: true,
         strategy: 'default',
-        message: 'Opened the project with the system default handler.',
+        message: translateUiText(locale, 'quickOpen.openedWithSystem'),
       };
     } catch (fallbackError) {
       return {
         success: false,
         strategy: null,
-        message: `Unable to open the project. code: ${formatCommandError(codeError)}; default: ${formatCommandError(fallbackError)}`,
+        message: translateUiText(locale, 'quickOpen.failed', {
+          codeError: formatCommandError(codeError),
+          defaultError: formatCommandError(fallbackError),
+        }),
       };
     }
   }

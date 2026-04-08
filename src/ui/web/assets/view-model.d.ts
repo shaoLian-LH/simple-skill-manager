@@ -1,3 +1,5 @@
+import type { UiLocale } from '../../text.js';
+
 export type AppRoute =
   | { name: 'dashboard' }
   | { name: 'projects' }
@@ -31,9 +33,9 @@ export interface PresetDeletePreview {
 export function parseRoute(pathname: string): AppRoute;
 export function routeToPath(route: AppRoute): string;
 export function filterProjects(projects: ProjectFilterItem[], searchQuery: string): ProjectFilterItem[];
-export function getProjectLabel(projectPath: string): string;
-export function formatRelativeTime(value?: string, now?: number): string;
-export function formatRouteTitle(route: AppRoute): string;
+export function getProjectLabel(projectPath: string, locale?: UiLocale): string;
+export function formatRelativeTime(value?: string, now?: number, locale?: UiLocale): string;
+export function formatRouteTitle(route: AppRoute, locale?: UiLocale): string;
 export function pickQuickActions(input: {
   route: AppRoute;
   dashboard?: { quickActions?: QuickAction[] } | null;
@@ -42,4 +44,7 @@ export function pickQuickActions(input: {
   presets?: { quickActions?: QuickAction[] } | null;
   config?: { quickActions?: QuickAction[] } | null;
 }): QuickAction[];
-export function buildPresetDeleteConfirmationMessage(preview: PresetDeletePreview | null | undefined): string;
+export function buildPresetDeleteConfirmationMessage(
+  preview: PresetDeletePreview | null | undefined,
+  locale?: UiLocale,
+): string;

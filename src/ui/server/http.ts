@@ -1,6 +1,7 @@
 import type { IncomingMessage, ServerResponse } from 'node:http';
 
 import { SkmError } from '../../core/errors.js';
+import { DEFAULT_UI_LOCALE, translateUiText, type UiLocale } from '../text.js';
 
 const MAX_JSON_BODY_BYTES = 1024 * 1024;
 
@@ -27,7 +28,7 @@ export function sendText(response: ServerResponse, statusCode: number, contentTy
   response.end(body);
 }
 
-export async function readJsonBody(request: IncomingMessage): Promise<unknown> {
+export async function readJsonBody(request: IncomingMessage, locale: UiLocale = DEFAULT_UI_LOCALE): Promise<unknown> {
   const chunks: Buffer[] = [];
   let receivedBytes = 0;
 
@@ -35,8 +36,8 @@ export async function readJsonBody(request: IncomingMessage): Promise<unknown> {
     const piece = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
     receivedBytes += piece.byteLength;
     if (receivedBytes > MAX_JSON_BODY_BYTES) {
-      throw new SkmError('usage', 'JSON body exceeds 1MB limit.', {
-        hint: 'Reduce payload size and retry.',
+      throw new SkmError('usage', translateUiText(locale, 'server.jsonTooLarge'), {
+        hint: translateUiText(locale, 'server.jsonTooLargeHint'),
       });
     }
     chunks.push(piece);
@@ -49,9 +50,9 @@ export async function readJsonBody(request: IncomingMessage): Promise<unknown> {
   try {
     return JSON.parse(Buffer.concat(chunks).toString('utf8')) as unknown;
   } catch (error) {
-    throw new SkmError('usage', 'Request body must be valid JSON.', {
+    throw new SkmError('usage', translateUiText(locale, 'server.invalidJsonBody'), {
       details: error instanceof Error ? error.message : undefined,
-      hint: 'Provide a syntactically valid JSON payload.',
+      hint: translateUiText(locale, 'server.invalidJsonBodyHint'),
       cause: error,
     });
   }

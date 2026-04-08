@@ -16,6 +16,24 @@ describe('quick open project path', () => {
     expect(result).toEqual({
       success: true,
       strategy: 'code',
+      message: '已在 VS Code 中打开项目。',
+    });
+  });
+
+  it('supports explicit english locale for success messages', async () => {
+    const result = await quickOpenProjectPath(
+      '/tmp/project',
+      async (command) => {
+        if (command !== 'code') {
+          throw new Error('unexpected fallback');
+        }
+      },
+      'en-US',
+    );
+
+    expect(result).toEqual({
+      success: true,
+      strategy: 'code',
       message: 'Opened the project in VS Code.',
     });
   });
@@ -49,4 +67,3 @@ describe('quick open project path', () => {
     expect(result.message).toContain('default failed');
   });
 });
-

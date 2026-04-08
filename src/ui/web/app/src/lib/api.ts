@@ -1,4 +1,5 @@
 import type { ApiErrorDetail } from '../types';
+import { getCurrentUiLocale } from './i18n';
 
 interface ApiSuccessEnvelope<T> {
   ok: true;
@@ -26,6 +27,7 @@ export async function apiRequest<T>(pathname: string, init: RequestInit = {}): P
     ...init,
     headers: {
       accept: 'application/json',
+      'x-skm-lang': getCurrentUiLocale(),
       ...(init.body ? { 'content-type': 'application/json' } : {}),
       ...(init.headers ?? {}),
     },

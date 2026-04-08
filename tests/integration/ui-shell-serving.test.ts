@@ -85,8 +85,25 @@ describe.sequential('ui shell serving and quick-open endpoint', () => {
           const bootPayload = (await bootResponse.json()) as { ok: boolean; data: { initialRoute: string; matchedProjectId: string | null } };
           expect(bootResponse.status).toBe(200);
           expect(bootPayload.ok).toBe(true);
-          expect(bootPayload.data.initialRoute).toBe('/dashboard');
+          expect(bootPayload.data.initialRoute).toBe('/overview');
           expect(bootPayload.data.matchedProjectId).toBeNull();
+
+          const launchCwdOpenResponse = await fetch(`${server.launchStatus.url}/api/launch-cwd/open`, {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({}),
+          });
+          const launchCwdOpenPayload = (await launchCwdOpenResponse.json()) as {
+            ok: boolean;
+            data: { success: boolean; strategy: string | null; message: string };
+          };
+          expect(launchCwdOpenResponse.status).toBe(200);
+          expect(launchCwdOpenPayload.ok).toBe(true);
+          expect(launchCwdOpenPayload.data).toEqual({
+            success: true,
+            strategy: 'code',
+            message: 'Opened in VS Code.',
+          });
 
           const successResponse = await fetch(
             `${server.launchStatus.url}/api/projects/${encodeURIComponent(projectId ?? '')}/quick-open`,
