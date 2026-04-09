@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { runCli } from '../../src/cli/program.js';
 import { FakePromptAdapter } from '../helpers/fake-prompt.js';
-import { createSkillFixtures } from '../helpers/fixtures.js';
+import { createSkillFixtures, writePresetsFile } from '../helpers/fixtures.js';
 import { initConfigWithSkills } from '../helpers/skm-env.js';
 import { withTempDir } from '../helpers/temp.js';
 
@@ -223,6 +223,148 @@ describe('interactive workflows', () => {
         ]),
       );
       expect(promptAdapter.calls.confirm[0]?.message).toContain('globally');
+    });
+  });
+
+  it('preselects explicitly enabled project skills in interactive enable prompts', async () => {
+    await withTempDir('skm-home-', async (homeDir) => {
+      await withTempDir('skm-project-', async (projectDir) => {
+        const originalCwd = process.cwd();
+        process.env.HOME = homeDir;
+        const skillsDir = path.join(homeDir, 'skills-registry');
+        await createSkillFixtures(skillsDir, [
+          { dirName: 'brainstorming', name: 'brainstorming' },
+          { dirName: 'test-engineer', name: 'test-engineer' },
+        ]);
+        await initConfigWithSkills(homeDir, skillsDir);
+
+        vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
+
+        process.chdir(projectDir);
+        try {
+          expect(await runCli(['node', 'skm', 'skill', 'enable', 'brainstorming', '--target', '.agents'])).toBe(0);
+
+          const promptAdapter = new FakePromptAdapter({
+            selectMany: [['brainstorming'], ['.agents']],
+            confirm: [false],
+          });
+
+          expect(
+            await runCli(['node', 'skm', 'skill', 'enable'], {
+              promptAdapter,
+              isInteractiveSession: () => true,
+            }),
+          ).toBe(0);
+
+          expect(promptAdapter.calls.selectMany[0]?.options?.initial).toEqual(['brainstorming']);
+        } finally {
+          process.chdir(originalCwd);
+        }
+      });
+    });
+  });
+
+  it('does not preselect skills that are only enabled via presets', async () => {
+    await withTempDir('skm-home-', async (homeDir) => {
+      await withTempDir('skm-project-', async (projectDir) => {
+        const originalCwd = process.cwd();
+        process.env.HOME = homeDir;
+        const skillsDir = path.join(homeDir, 'skills-registry');
+        await createSkillFixtures(skillsDir, [
+          { dirName: 'brainstorming', name: 'brainstorming' },
+          { dirName: 'test-engineer', name: 'test-engineer' },
+        ]);
+        await initConfigWithSkills(homeDir, skillsDir);
+        await writePresetsFile(
+          path.join(homeDir, '.simple-skill-manager', 'presets.yaml'),
+          ['frontend-basic:', '  - brainstorming', '  - test-engineer'].join('\n'),
+        );
+
+        vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
+
+        process.chdir(projectDir);
+        try {
+          expect(await runCli(['node', 'skm', 'preset', 'enable', 'frontend-basic', '--target', '.agents'])).toBe(0);
+
+          const promptAdapter = new FakePromptAdapter({
+            selectMany: [['brainstorming'], ['.agents']],
+            confirm: [false],
+          });
+
+          expect(
+            await runCli(['node', 'skm', 'skill', 'enable'], {
+              promptAdapter,
+              isInteractiveSession: () => true,
+            }),
+          ).toBe(0);
+
+          expect(promptAdapter.calls.selectMany[0]?.options?.initial).toEqual([]);
+        } finally {
+          process.chdir(originalCwd);
+        }
+      });
+    });
+  });
+
+  it('preselects explicitly enabled project presets in interactive enable prompts', async () => {
+    await withTempDir('skm-home-', async (homeDir) => {
+      await withTempDir('skm-project-', async (projectDir) => {
+        const originalCwd = process.cwd();
+        process.env.HOME = homeDir;
+        const skillsDir = path.join(homeDir, 'skills-registry');
+        await createSkillFixtures(skillsDir, [{ dirName: 'brainstorming', name: 'brainstorming' }]);
+        await initConfigWithSkills(homeDir, skillsDir);
+        await writePresetsFile(path.join(homeDir, '.simple-skill-manager', 'presets.yaml'), ['frontend-basic:', '  - brainstorming'].join('\n'));
+
+        vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
+
+        process.chdir(projectDir);
+        try {
+          expect(await runCli(['node', 'skm', 'preset', 'enable', 'frontend-basic', '--target', '.agents'])).toBe(0);
+
+          const promptAdapter = new FakePromptAdapter({
+            selectMany: [['frontend-basic'], ['.agents']],
+            confirm: [false],
+          });
+
+          expect(
+            await runCli(['node', 'skm', 'preset', 'enable'], {
+              promptAdapter,
+              isInteractiveSession: () => true,
+            }),
+          ).toBe(0);
+
+          expect(promptAdapter.calls.selectMany[0]?.options?.initial).toEqual(['frontend-basic']);
+        } finally {
+          process.chdir(originalCwd);
+        }
+      });
+    });
+  });
+
+  it('preselects explicitly enabled global skills in interactive enable prompts', async () => {
+    await withTempDir('skm-home-', async (homeDir) => {
+      process.env.HOME = homeDir;
+      const skillsDir = path.join(homeDir, 'skills-registry');
+      await createSkillFixtures(skillsDir, [{ dirName: 'brainstorming', name: 'brainstorming' }]);
+      await initConfigWithSkills(homeDir, skillsDir);
+
+      vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
+      expect(await runCli(['node', 'skm', 'skill', 'enable', 'brainstorming', '--global', '--target', '.agents'])).toBe(0);
+
+      const promptAdapter = new FakePromptAdapter({
+        selectMany: [['brainstorming'], ['.agents']],
+        confirm: [false],
+      });
+
+      expect(
+        await runCli(['node', 'skm', 'skill', 'enable', '--global'], {
+          promptAdapter,
+          isInteractiveSession: () => true,
+        }),
+      ).toBe(0);
+
+      expect(promptAdapter.calls.selectMany[0]?.options?.initial).toEqual(['brainstorming']);
     });
   });
 });

@@ -223,6 +223,7 @@ function createProgram(deps: CliDependencies = {}): Command {
         printStdout(renderMessage('No skills are available to enable.'));
         return;
       }
+      const previousState = await loadScopeState(scope, process.cwd());
       const selectedSkills = await collectMany(
         { canPrompt: canPrompt(), prompt },
         names,
@@ -230,10 +231,10 @@ function createProgram(deps: CliDependencies = {}): Command {
         'Select skills to enable',
         'At least one skill name is required in non-interactive mode.',
         'Run `skm skill enable <name...> --target <target>`.',
+        previousState?.enabledSkills ?? [],
       );
 
       const { config } = await loadConfig();
-      const previousState = await loadScopeState(scope, process.cwd());
       const defaultTargets =
         previousState && Object.keys(previousState.targets).length > 0
           ? Object.keys(previousState.targets)
@@ -346,6 +347,7 @@ function createProgram(deps: CliDependencies = {}): Command {
     .action(async (names: string[] | undefined, options: { target: string[]; global?: boolean }) => {
       const scope: ActivationScope = options.global ? 'global' : 'project';
       const presets = await listPresetDefinitions();
+      const previousState = await loadScopeState(scope, process.cwd());
       const selectedPresets = await collectMany(
         { canPrompt: canPrompt(), prompt },
         names,
@@ -353,6 +355,7 @@ function createProgram(deps: CliDependencies = {}): Command {
         'Select presets to enable',
         'At least one preset name is required in non-interactive mode.',
         'Run `skm preset enable <name...> --target <target>`.',
+        previousState?.enabledPresets ?? [],
       );
 
       if (selectedPresets.values.length === 0) {
@@ -361,7 +364,6 @@ function createProgram(deps: CliDependencies = {}): Command {
       }
 
       const { config } = await loadConfig();
-      const previousState = await loadScopeState(scope, process.cwd());
       const defaultTargets =
         previousState && Object.keys(previousState.targets).length > 0
           ? Object.keys(previousState.targets)
