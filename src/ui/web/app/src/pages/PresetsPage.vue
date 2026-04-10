@@ -35,10 +35,7 @@ const filteredPresets = computed(() => {
 
 useWorkspaceSpine(() => ({
   scopeLabel: t('presets.title'),
-  scopeDescription:
-    presets.value.length > 0
-      ? t('presets.showingCount', { shown: filteredPresets.value.length, total: presets.value.length })
-      : errorMessage.value || t('presets.scopeDescription'),
+  scopeDescription: errorMessage.value || t('presets.scopeDescription'),
 }));
 
 function formatSummary(preset: PresetView): string {
@@ -78,15 +75,9 @@ onMounted(() => {
 
 <template>
   <section class="space-y-4">
-    <header class="panel">
-      <div class="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
-        <p class="text-sm text-muted">
-          {{ t('presets.showingCount', { shown: filteredPresets.length, total: presets.length }) }}
-        </p>
-      </div>
-
-      <div class="mt-4">
-        <label class="field-label" for="preset-search">{{ t('common.search') }}</label>
+    <header class="page-search-bar">
+      <label class="page-search-bar__label" for="preset-search">{{ t('common.search') }}</label>
+      <div class="page-search-bar__input">
         <input
           id="preset-search"
           v-model="searchQuery"

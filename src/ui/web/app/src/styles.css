@@ -391,6 +391,38 @@ a {
     0 0 0 4px rgba(59, 130, 246, 0.16);
 }
 
+.page-search-bar {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  align-items: center;
+}
+
+.page-search-bar__label {
+  @apply text-sm text-muted;
+  white-space: nowrap;
+  text-align: right;
+}
+
+.page-search-bar__input {
+  width: min(100%, 30rem);
+}
+
+.page-search-bar__input .text-input {
+  margin-top: 0;
+}
+
+@media (min-width: 768px) {
+  .page-search-bar {
+    gap: 1rem;
+  }
+
+  .page-search-bar__input {
+    width: min(100%, 32rem);
+  }
+}
+
 .error-text {
   @apply mt-2 text-xs text-red-700;
 }

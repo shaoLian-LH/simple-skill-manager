@@ -282,56 +282,7 @@ onMounted(() => {
         {{ actionMessage }}
       </p>
 
-      <div class="grid gap-4 xl:grid-cols-[minmax(0,1.45fr)_minmax(0,1fr)]">
-        <section class="panel">
-          <p class="field-label">{{ t('projectDetail.presets') }}</p>
-          <p class="mt-2 text-sm leading-6 text-muted">{{ t('projectDetail.presetsDescription') }}</p>
-
-          <div class="mt-4 space-y-4">
-            <div>
-              <p class="field-label">{{ t('projectDetail.enabledSection') }}</p>
-              <ul v-if="detail.presetControls.enabled.length > 0" class="mt-2 space-y-2">
-                <li v-for="row in detail.presetControls.enabled" :key="`enabled-preset-${row.name}`" class="control-row">
-                  <div class="min-w-0">
-                    <p class="truncate font-semibold text-charcoal">{{ row.name }}</p>
-                    <p class="mt-2 text-xs leading-5 text-muted">{{ presetMeta(row) }}</p>
-                  </div>
-                  <button
-                    type="button"
-                    class="btn-secondary"
-                    :disabled="isPresetBusy(row.name) || !row.editable"
-                    @click="togglePreset(row)"
-                  >
-                    {{ row.editable ? (isPresetBusy(row.name) ? t('common.updating') : t('common.disable')) : t('common.readonly') }}
-                  </button>
-                </li>
-              </ul>
-              <p v-else class="mt-2 text-sm text-muted">{{ t('projectDetail.noEnabledPresets') }}</p>
-            </div>
-
-            <div>
-              <p class="field-label">{{ t('projectDetail.availableSection') }}</p>
-              <ul v-if="detail.presetControls.available.length > 0" class="mt-2 space-y-2">
-                <li v-for="row in detail.presetControls.available" :key="`available-preset-${row.name}`" class="control-row">
-                  <div class="min-w-0">
-                    <p class="truncate font-semibold text-charcoal">{{ row.name }}</p>
-                    <p class="mt-2 text-xs leading-5 text-muted">{{ presetMeta(row) }}</p>
-                  </div>
-                  <button
-                    type="button"
-                    class="btn-secondary"
-                    :disabled="isPresetBusy(row.name) || !row.editable"
-                    @click="togglePreset(row)"
-                  >
-                    {{ row.editable ? (isPresetBusy(row.name) ? t('common.updating') : t('common.enable')) : t('common.readonly') }}
-                  </button>
-                </li>
-              </ul>
-              <p v-else class="mt-2 text-sm text-muted">{{ t('projectDetail.allPresetsEnabled') }}</p>
-            </div>
-          </div>
-        </section>
-
+      <div class="project-detail-layout">
         <section class="panel">
           <div class="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
             <div>
@@ -353,16 +304,23 @@ onMounted(() => {
           <div class="mt-4 space-y-4">
             <div>
               <p class="field-label">{{ t('projectDetail.enabledSection') }}</p>
-              <ul v-if="filteredEnabledSkillRows.length > 0" class="mt-2 space-y-2">
-                <li v-for="row in filteredEnabledSkillRows" :key="`enabled-skill-${row.name}`" class="control-row">
+              <ul v-if="filteredEnabledSkillRows.length > 0" class="skill-control-grid mt-3">
+                <li v-for="row in filteredEnabledSkillRows" :key="`enabled-skill-${row.name}`" class="skill-control-card">
                   <div class="min-w-0">
-                    <p class="truncate font-semibold text-charcoal">{{ row.name }}</p>
-                    <p class="mt-2 text-xs leading-5 text-muted">{{ row.description || row.path }}</p>
-                    <p class="mt-1 text-xs text-muted">{{ skillMeta(row) }}</p>
+                    <p class="skill-control-card__title font-semibold text-charcoal" :title="row.name">{{ row.name }}</p>
+                    <p
+                      class="skill-control-card__description mt-3 text-xs leading-5 text-muted"
+                      :title="row.description || row.path"
+                    >
+                      {{ row.description || row.path }}
+                    </p>
+                    <p class="skill-control-card__meta mt-3 text-xs text-muted">
+                      {{ skillMeta(row) }}
+                    </p>
                   </div>
                   <button
                     type="button"
-                    class="btn-secondary"
+                    class="btn-secondary skill-control-card__button"
                     :disabled="isSkillBusy(row.name) || !row.editable"
                     @click="toggleSkill(row)"
                   >
@@ -381,16 +339,23 @@ onMounted(() => {
 
             <div>
               <p class="field-label">{{ t('projectDetail.availableSection') }}</p>
-              <ul v-if="filteredAvailableSkillRows.length > 0" class="mt-2 space-y-2">
-                <li v-for="row in filteredAvailableSkillRows" :key="`available-skill-${row.name}`" class="control-row">
+              <ul v-if="filteredAvailableSkillRows.length > 0" class="skill-control-grid mt-3">
+                <li v-for="row in filteredAvailableSkillRows" :key="`available-skill-${row.name}`" class="skill-control-card">
                   <div class="min-w-0">
-                    <p class="truncate font-semibold text-charcoal">{{ row.name }}</p>
-                    <p class="mt-2 text-xs leading-5 text-muted">{{ row.description || row.path }}</p>
-                    <p class="mt-1 text-xs text-muted">{{ row.reason || t('projectDetail.notEnabled') }}</p>
+                    <p class="skill-control-card__title font-semibold text-charcoal" :title="row.name">{{ row.name }}</p>
+                    <p
+                      class="skill-control-card__description mt-3 text-xs leading-5 text-muted"
+                      :title="row.description || row.path"
+                    >
+                      {{ row.description || row.path }}
+                    </p>
+                    <p class="skill-control-card__meta mt-3 text-xs text-muted">
+                      {{ row.reason || t('projectDetail.notEnabled') }}
+                    </p>
                   </div>
                   <button
                     type="button"
-                    class="btn-secondary"
+                    class="btn-secondary skill-control-card__button"
                     :disabled="isSkillBusy(row.name)"
                     @click="toggleSkill(row)"
                   >
@@ -402,6 +367,55 @@ onMounted(() => {
             </div>
           </div>
         </section>
+
+        <aside class="panel">
+          <p class="field-label">{{ t('projectDetail.presets') }}</p>
+          <p class="mt-2 text-sm leading-6 text-muted">{{ t('projectDetail.presetsDescription') }}</p>
+
+          <div class="mt-4 space-y-4">
+            <div>
+              <p class="field-label">{{ t('projectDetail.enabledSection') }}</p>
+              <ul v-if="detail.presetControls.enabled.length > 0" class="mt-2 space-y-2">
+                <li v-for="row in detail.presetControls.enabled" :key="`enabled-preset-${row.name}`" class="preset-control-row">
+                  <div class="min-w-0">
+                    <p class="truncate font-semibold text-charcoal">{{ row.name }}</p>
+                    <p class="mt-2 text-xs leading-5 text-muted">{{ presetMeta(row) }}</p>
+                  </div>
+                  <button
+                    type="button"
+                    class="btn-secondary preset-control-row__button"
+                    :disabled="isPresetBusy(row.name) || !row.editable"
+                    @click="togglePreset(row)"
+                  >
+                    {{ row.editable ? (isPresetBusy(row.name) ? t('common.updating') : t('common.disable')) : t('common.readonly') }}
+                  </button>
+                </li>
+              </ul>
+              <p v-else class="mt-2 text-sm text-muted">{{ t('projectDetail.noEnabledPresets') }}</p>
+            </div>
+
+            <div>
+              <p class="field-label">{{ t('projectDetail.availableSection') }}</p>
+              <ul v-if="detail.presetControls.available.length > 0" class="mt-2 space-y-2">
+                <li v-for="row in detail.presetControls.available" :key="`available-preset-${row.name}`" class="preset-control-row">
+                  <div class="min-w-0">
+                    <p class="truncate font-semibold text-charcoal">{{ row.name }}</p>
+                    <p class="mt-2 text-xs leading-5 text-muted">{{ presetMeta(row) }}</p>
+                  </div>
+                  <button
+                    type="button"
+                    class="btn-secondary preset-control-row__button"
+                    :disabled="isPresetBusy(row.name) || !row.editable"
+                    @click="togglePreset(row)"
+                  >
+                    {{ row.editable ? (isPresetBusy(row.name) ? t('common.updating') : t('common.enable')) : t('common.readonly') }}
+                  </button>
+                </li>
+              </ul>
+              <p v-else class="mt-2 text-sm text-muted">{{ t('projectDetail.allPresetsEnabled') }}</p>
+            </div>
+          </div>
+        </aside>
       </div>
 
       <aside class="panel">
@@ -429,7 +443,12 @@ onMounted(() => {
 </template>
 
 <style scoped>
-.control-row {
+.project-detail-layout {
+  display: grid;
+  gap: 1rem;
+}
+
+.preset-control-row {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
@@ -443,6 +462,58 @@ onMounted(() => {
     rgba(34, 42, 53, 0.08) 0px 0px 0px 1px;
 }
 
+.preset-control-row__button {
+  white-space: nowrap;
+}
+
+.skill-control-grid {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.skill-control-card {
+  display: flex;
+  min-height: 100%;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 1rem;
+  border-radius: 0.75rem;
+  background: #f5f5f5;
+  padding: 1rem;
+  box-shadow:
+    rgba(19, 19, 22, 0.7) 0px 1px 5px -4px,
+    rgba(34, 42, 53, 0.08) 0px 0px 0px 1px;
+}
+
+.skill-control-card__title {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.skill-control-card__description {
+  display: -webkit-box;
+  min-height: calc(1.25rem * 6);
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 6;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.skill-control-card__meta {
+  display: -webkit-box;
+  min-height: calc(1.25rem * 3);
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+}
+
+.skill-control-card__button {
+  width: 100%;
+}
+
 .resolved-row {
   border-radius: 0.75rem;
   background: #f5f5f5;
@@ -450,5 +521,41 @@ onMounted(() => {
   box-shadow:
     rgba(19, 19, 22, 0.7) 0px 1px 5px -4px,
     rgba(34, 42, 53, 0.08) 0px 0px 0px 1px;
+}
+
+@media (min-width: 640px) {
+  .skill-control-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 1024px) {
+  .skill-control-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 1024px) {
+  .project-detail-layout {
+    grid-template-columns: minmax(0, 3fr) minmax(0, 1fr);
+    align-items: start;
+  }
+}
+
+@media (min-width: 1536px) {
+  .skill-control-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 1439px) {
+  .preset-control-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .preset-control-row__button {
+    width: 100%;
+    margin-top: 0.25rem;
+  }
 }
 </style>

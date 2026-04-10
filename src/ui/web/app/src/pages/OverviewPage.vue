@@ -257,10 +257,7 @@ onMounted(() => {
 
     <template v-else-if="model">
       <section class="space-y-3">
-        <div class="flex items-center justify-between">
-          <p class="field-label">{{ t('overview.recommendedActions') }}</p>
-          <p class="text-xs text-muted">{{ t('overview.actionsCount', { count: model.recommendedActions.length }) }}</p>
-        </div>
+        <p class="field-label">{{ t('overview.recommendedActions') }}</p>
         <ul class="overview-action-grid">
           <li v-for="action in model.recommendedActions.slice(0, 3)" :key="action.id" class="overview-action-card">
             <p class="font-semibold text-charcoal">{{ action.label }}</p>
@@ -299,16 +296,18 @@ onMounted(() => {
           <p class="field-label">{{ t('overview.recentProjects') }}</p>
           <button type="button" class="btn-ghost" @click="openAction('/projects')">{{ t('common.viewAll') }}</button>
         </div>
-        <ul v-if="model.recentProjects.length > 0" class="mt-2 space-y-2">
+        <ul v-if="model.recentProjects.length > 0" class="recent-project-grid mt-4">
           <li
-            v-for="project in model.recentProjects.slice(0, 5)"
+            v-for="project in model.recentProjects.slice(0, 6)"
             :key="project.projectId"
-            class="rounded-card bg-subtle p-4 shadow-card"
+            class="recent-project-card rounded-card bg-subtle p-4 shadow-card"
           >
-            <div class="flex items-start justify-between gap-3">
-              <div>
+            <div class="recent-project-card__body">
+              <div class="min-w-0">
                 <p class="font-semibold text-charcoal">{{ formatProjectName(project.projectPath) }}</p>
-                <p class="mt-2 break-all text-xs leading-5 text-muted">{{ project.projectPath }}</p>
+                <p class="recent-project-card__path mt-2 text-xs leading-5 text-muted" :title="project.projectPath">
+                  {{ project.projectPath }}
+                </p>
                 <p class="mt-2 text-xs leading-5 text-muted">
                   {{
                     t('overview.skillPresetSummary', {
@@ -318,8 +317,12 @@ onMounted(() => {
                   }}
                 </p>
               </div>
-              <div class="text-right">
+            </div>
+            <div class="recent-project-card__footer">
+              <div class="min-w-0">
                 <p class="text-xs text-muted">{{ formatDateTime(project.updatedAt) }}</p>
+              </div>
+              <div class="recent-project-card__actions text-right">
                 <button type="button" class="btn-ghost mt-2" @click="openProject(project.projectId)">
                   {{ t('common.open') }}
                 </button>
@@ -334,3 +337,72 @@ onMounted(() => {
     </template>
   </section>
 </template>
+
+<style scoped>
+.recent-project-grid {
+  display: grid;
+  gap: 1rem;
+}
+
+.recent-project-card {
+  display: flex;
+  min-height: 100%;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.recent-project-card__body {
+  min-width: 0;
+}
+
+.recent-project-card__footer {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.recent-project-card__path {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.recent-project-card__actions {
+  flex-shrink: 0;
+}
+
+@media (min-width: 640px) {
+  .recent-project-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 768px) {
+  .recent-project-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 1024px) {
+  .recent-project-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 1280px) {
+  .recent-project-grid {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 1536px) {
+  .recent-project-grid {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+  }
+}
+</style>

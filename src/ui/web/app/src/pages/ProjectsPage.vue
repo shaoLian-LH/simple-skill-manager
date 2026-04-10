@@ -41,10 +41,7 @@ const filteredRows = computed(() => {
 
 useWorkspaceSpine(() => ({
   scopeLabel: t('projects.title'),
-  scopeDescription:
-    rows.value.length > 0
-      ? t('projects.showingCount', { shown: filteredRows.value.length, total: rows.value.length })
-      : errorMessage.value || t('projects.description'),
+  scopeDescription: errorMessage.value || t('projects.description'),
 }));
 
 function asRecord(value: unknown): Record<string, unknown> | null {
@@ -171,15 +168,9 @@ onMounted(() => {
 
 <template>
   <section class="space-y-4">
-    <header class="panel">
-      <div class="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
-        <p class="text-sm text-muted">
-          {{ t('projects.showingCount', { shown: filteredRows.length, total: rows.length }) }}
-        </p>
-      </div>
-
-      <div class="mt-4">
-        <label class="field-label" for="project-search">{{ t('common.search') }}</label>
+    <header class="page-search-bar">
+      <label class="page-search-bar__label" for="project-search">{{ t('common.search') }}</label>
+      <div class="page-search-bar__input">
         <input
           id="project-search"
           v-model="searchQuery"

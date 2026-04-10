@@ -71,10 +71,7 @@ const filteredCards = computed(() => {
 
 useWorkspaceSpine(() => ({
   scopeLabel: t('nav.skills'),
-  scopeDescription:
-    cards.value.length > 0
-      ? t('skills.showingCount', { shown: filteredCards.value.length, total: cards.value.length })
-      : loadError.value || actionError.value || t('skills.description'),
+  scopeDescription: loadError.value || actionError.value || t('skills.description'),
 }));
 
 function onCardKeydown(event: KeyboardEvent, cardKey: string): void {
@@ -406,14 +403,9 @@ onMounted(() => {
 
 <template>
   <section class="space-y-4">
-    <header class="panel">
-      <div class="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
-        <p class="text-sm text-muted">
-          {{ t('skills.showingCount', { shown: filteredCards.length, total: cards.length }) }}
-        </p>
-      </div>
-      <div class="mt-4">
-        <label class="field-label" for="skill-search">{{ t('common.search') }}</label>
+    <header class="page-search-bar">
+      <label class="page-search-bar__label" for="skill-search">{{ t('common.search') }}</label>
+      <div class="page-search-bar__input">
         <input
           id="skill-search"
           v-model="searchQuery"
@@ -451,7 +443,6 @@ onMounted(() => {
           >
             <div class="skill-card-header">
               <div class="skill-card-header__main">
-                <p class="field-label">{{ t('skills.summaryLabel') }}</p>
                 <h4 class="mt-2 font-display text-2xl text-charcoal skill-card-title" :title="card.name">{{ card.name }}</h4>
               </div>
               <div class="skill-card-header__actions">

@@ -38,7 +38,7 @@ const navigationItems = [
 ] as const;
 
 const activeNavKey = computed(() => String(route.meta.navKey ?? ''));
-const routeTitle = computed(() => t(String(route.meta.titleKey ?? 'route.workbench')));
+const routeTitle = computed(() => t(String(route.meta.titleKey ?? 'route.overview')));
 const routeDescription = computed(() => {
   switch (activeNavKey.value) {
     case 'overview':
@@ -310,7 +310,7 @@ watch(
       </aside>
 
       <div class="workspace-stage">
-        <section class="context-band" aria-label="Workspace context">
+        <section class="context-band" aria-label="Page context">
           <div class="context-meta-item">
             <p v-if="showUnmatchedDirectory" class="context-meta-note">
               {{ t('app.unmatchedLaunchDirectory') }}
