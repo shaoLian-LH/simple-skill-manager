@@ -101,7 +101,7 @@ describe('ui web view model helpers', () => {
       referenceCount: 0,
       referenceProjects: [],
     });
-    expect(noRefMessage).toContain('确认删除技能集 frontend-v1 吗？');
+    expect(noRefMessage).toContain('确认移除技能集 frontend-v1 吗？');
 
     const withRefMessage = buildPresetDeleteConfirmationMessage({
       name: 'frontend-v1',
@@ -114,7 +114,7 @@ describe('ui web view model helpers', () => {
     expect(withRefMessage).toContain('技能集 frontend-v1 当前影响 2 个项目。');
     expect(withRefMessage).toContain('/tmp/a');
     expect(withRefMessage).toContain('/tmp/b');
-    expect(withRefMessage).toContain('确认删除技能集 frontend-v1 吗？');
+    expect(withRefMessage).toContain('确认移除技能集 frontend-v1 吗？');
 
     const englishMessage = buildPresetDeleteConfirmationMessage(
       {
@@ -125,7 +125,7 @@ describe('ui web view model helpers', () => {
       'en-US',
     );
     expect(englishMessage).toContain('Preset frontend-v1 currently affects 2 project(s).');
-    expect(englishMessage).toContain('Delete preset frontend-v1?');
+    expect(englishMessage).toContain('Remove preset frontend-v1?');
   });
 
   it('builds readonly delete messages for dynamic presets', () => {

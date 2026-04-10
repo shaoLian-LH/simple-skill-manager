@@ -177,7 +177,7 @@ async function togglePreset(row: ProjectPresetControlView): Promise<void> {
   actionMessage.value = '';
 
   try {
-    const endpoint = row.enabled ? 'disable' : 'enable';
+    const endpoint = row.enabled ? 'off' : 'on';
     const payload = row.enabled
       ? { presetNames: [row.name] }
       : { presetNames: [row.name], targets: [] as string[] };
@@ -211,7 +211,7 @@ async function toggleSkill(row: ProjectSkillControlView): Promise<void> {
   actionMessage.value = '';
 
   try {
-    const endpoint = row.direct ? 'disable' : 'enable';
+    const endpoint = row.direct ? 'off' : 'on';
     const payload = row.direct
       ? { skillNames: [row.name] }
       : { skillNames: [row.name], targets: [] as string[] };

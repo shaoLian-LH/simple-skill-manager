@@ -155,7 +155,7 @@ describe.sequential('ui shell serving and quick-open endpoint', () => {
         const skillsDir = path.join(homeDir, 'skills-registry');
         await createSkillFixtures(skillsDir, [{ dirName: 'brainstorming', name: 'brainstorming' }]);
         await initConfigWithSkills(homeDir, skillsDir);
-        await runCli(['skill', 'enable', 'brainstorming', '--target', '.agents'], {
+        await runCli(['skill', 'on', 'brainstorming', '--target', '.agents'], {
           cwd: projectDir,
           env: { HOME: homeDir },
         });

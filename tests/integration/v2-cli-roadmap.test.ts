@@ -31,15 +31,15 @@ describe('v2 CLI roadmap', () => {
         await initConfigWithSkills(homeDir, skillsDir);
 
         await runCli(['preset', 'create', 'frontend-v2', 'brainstorming', 'test-engineer'], { env: { HOME: homeDir } });
-        await runCli(['skill', 'enable', 'brainstorming', 'code-review-process', '--target', '.agents'], {
+        await runCli(['skill', 'on', 'brainstorming', 'code-review-process', '--target', '.agents'], {
           cwd: projectDir,
           env: { HOME: homeDir },
         });
-        await runCli(['preset', 'enable', 'frontend-v2', '--target', '.agents'], {
+        await runCli(['preset', 'on', 'frontend-v2', '--target', '.agents'], {
           cwd: projectDir,
           env: { HOME: homeDir },
         });
-        await runCli(['skill', 'disable', 'brainstorming', 'code-review-process'], {
+        await runCli(['skill', 'off', 'brainstorming', 'code-review-process'], {
           cwd: projectDir,
           env: { HOME: homeDir },
         });
@@ -81,15 +81,15 @@ describe('v2 CLI roadmap', () => {
       const skillInspect = await runCli(['skill', 'inspect'], { env: { HOME: homeDir } });
       expect(skillInspect.stdout).toContain('No skills are available to inspect.');
 
-      await runCli(['preset', 'delete', 'frontend-basic'], { env: { HOME: homeDir } });
+      await runCli(['preset', 'rm', 'frontend-basic'], { env: { HOME: homeDir } });
       const presetInspect = await runCli(['preset', 'inspect'], { env: { HOME: homeDir } });
       expect(presetInspect.stdout).toContain('No presets are available to inspect.');
 
       const presetUpdate = await runCli(['preset', 'update'], { env: { HOME: homeDir } });
       expect(presetUpdate.stdout).toContain('No skills are available to update preset definitions.');
 
-      const presetDelete = await runCli(['preset', 'delete'], { env: { HOME: homeDir } });
-      expect(presetDelete.stdout).toContain('No presets are available to delete.');
+      const presetDelete = await runCli(['preset', 'rm'], { env: { HOME: homeDir } });
+      expect(presetDelete.stdout).toContain('No presets are available to remove.');
     });
   });
 
@@ -99,8 +99,8 @@ describe('v2 CLI roadmap', () => {
       await fs.mkdir(skillsDir, { recursive: true });
       await initConfigWithSkills(homeDir, skillsDir);
 
-      const skillEnable = await runCli(['skill', 'enable'], { env: { HOME: homeDir } });
-      expect(skillEnable.stdout).toContain('No skills are available to enable.');
+      const skillEnable = await runCli(['skill', 'on'], { env: { HOME: homeDir } });
+      expect(skillEnable.stdout).toContain('No skills are available to turn on.');
 
       const presetCreate = await runCli(['preset', 'create', 'frontend-v2'], { env: { HOME: homeDir } });
       expect(presetCreate.stdout).toContain('No skills are available to create a preset.');
@@ -142,8 +142,8 @@ describe('v2 CLI roadmap', () => {
         const inspect = await runCli(['preset', 'inspect', 'frontend-v2'], { env: { HOME: homeDir } });
         expect(JSON.parse(inspect.stdout)).toEqual({ name: 'frontend-v2', skills: ['brainstorming'], source: 'static', readonly: false });
 
-        await runCli(['preset', 'enable', 'frontend-v2', '--target', '.agents'], { cwd: projectDir, env: { HOME: homeDir } });
-        const deleted = await runCli(['preset', 'delete', 'frontend-v2'], { env: { HOME: homeDir } });
+        await runCli(['preset', 'on', 'frontend-v2', '--target', '.agents'], { cwd: projectDir, env: { HOME: homeDir } });
+        const deleted = await runCli(['preset', 'rm', 'frontend-v2'], { env: { HOME: homeDir } });
         expect(JSON.parse(deleted.stdout)).toMatchObject({ name: 'frontend-v2', deleted: true, referencedProjects: 1 });
         expect(deleted.stderr).toContain('Warning: Preset frontend-v2 is still referenced');
 
@@ -158,7 +158,7 @@ describe('v2 CLI roadmap', () => {
         expect(syncFailure.code).toBe(3);
         expect(syncFailure.stderr).toContain('Preset definitions are missing');
 
-        await runCli(['preset', 'disable', 'frontend-v2'], { cwd: projectDir, env: { HOME: homeDir } });
+        await runCli(['preset', 'off', 'frontend-v2'], { cwd: projectDir, env: { HOME: homeDir } });
         const finalState = JSON.parse(await fs.readFile(path.join(projectDir, '.skm', 'state.json'), 'utf8')) as {
           enabledPresets: string[];
         };
@@ -180,7 +180,7 @@ describe('v2 CLI roadmap', () => {
       expect(updateFailure.code).toBe(4);
       expect(updateFailure.stderr).toContain('dynamic scope preset and cannot be modified');
 
-      const deleteFailure = await runCliExpectFailure(['preset', 'delete', 'impeccable'], { env: { HOME: homeDir } });
+      const deleteFailure = await runCliExpectFailure(['preset', 'rm', 'impeccable'], { env: { HOME: homeDir } });
       expect(deleteFailure.code).toBe(4);
       expect(deleteFailure.stderr).toContain('dynamic scope preset and cannot be modified');
     });

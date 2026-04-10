@@ -78,8 +78,8 @@ skm skill inspect brainstorming
 ### 5. 启用技能或预设
 
 ```bash
-skm skill enable brainstorming --target .agents
-skm preset enable frontend-basic --target .claude
+skm skill on brainstorming --target .agents
+skm preset on frontend-basic --target .claude
 ```
 
 ### 6. 校准并排查问题
@@ -105,10 +105,10 @@ skm doctor
 | --- | --- |
 | `skm skill list` | 列出 `skillsDir` 中发现的全部技能 |
 | `skm skill inspect [name]` | 显示单个技能的路径、frontmatter 和预览 |
-| `skm skill enable [names...] --target <target>` | 在当前项目中启用一个或多个技能 |
-| `skm skill enable [names...] --global --target <target>` | 在全局作用域启用一个或多个技能 |
-| `skm skill disable [names...]` | 禁用项目作用域的技能 |
-| `skm skill disable [names...] --global` | 禁用全局作用域的技能 |
+| `skm skill on [names...] --target <target>` | 在当前项目中启用一个或多个技能 |
+| `skm skill on [names...] --global --target <target>` | 在全局作用域启用一个或多个技能 |
+| `skm skill off [names...]` | 禁用项目作用域的技能 |
+| `skm skill off [names...] --global` | 禁用全局作用域的技能 |
 
 ### `preset`
 
@@ -116,13 +116,13 @@ skm doctor
 | --- | --- |
 | `skm preset list` | 列出所有已配置的预设 |
 | `skm preset inspect [name]` | 显示某个预设展开后的技能列表 |
-| `skm preset enable [names...] --target <target>` | 在当前项目中启用一个或多个预设 |
-| `skm preset enable [names...] --global --target <target>` | 在全局作用域启用一个或多个预设 |
-| `skm preset disable [names...]` | 禁用项目作用域的预设 |
-| `skm preset disable [names...] --global` | 禁用全局作用域的预设 |
+| `skm preset on [names...] --target <target>` | 在当前项目中启用一个或多个预设 |
+| `skm preset on [names...] --global --target <target>` | 在全局作用域启用一个或多个预设 |
+| `skm preset off [names...]` | 禁用项目作用域的预设 |
+| `skm preset off [names...] --global` | 禁用全局作用域的预设 |
 | `skm preset create [name] [skills...]` | 创建静态预设 |
 | `skm preset update [name] [skills...]` | 用新的完整技能列表替换静态预设 |
-| `skm preset delete [name]` | 从 `presets.yaml` 删除静态预设 |
+| `skm preset rm [name]` | 从 `presets.yaml` 删除静态预设 |
 
 ### `sync`、`doctor` 和 `ui`
 
@@ -204,7 +204,7 @@ Gemini 命令投影位置：
 
 相关行为：
 
-- `skm skill enable ...` 和 `skm preset enable ...` 会创建或更新 `.skm/state.json`
+- `skm skill on ...` 和 `skm preset on ...` 会创建或更新 `.skm/state.json`
 - 这些命令也会确保 `.gitignore` 包含 `.skm`
 - 命令成功时默认输出 JSON，除非 CLI 返回的是普通消息或错误信息
 

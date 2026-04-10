@@ -81,7 +81,7 @@ async function loadPresetDetail(): Promise<void> {
   try {
     const [detailPayload, previewPayload] = await Promise.all([
       apiRequest<PresetDetailView>(`/api/presets/${encodeURIComponent(name)}`),
-      apiRequest<PresetDeletePreviewView>(`/api/presets/${encodeURIComponent(name)}/delete-preview`),
+      apiRequest<PresetDeletePreviewView>(`/api/presets/${encodeURIComponent(name)}/rm-preview`),
     ]);
 
     detail.value = detailPayload;
@@ -166,7 +166,7 @@ async function deletePreset(): Promise<void> {
   actionMessage.value = '';
 
   try {
-    const preview = await apiRequest<PresetDeletePreviewView>(`/api/presets/${encodeURIComponent(current.name)}/delete-preview`);
+    const preview = await apiRequest<PresetDeletePreviewView>(`/api/presets/${encodeURIComponent(current.name)}/rm-preview`);
     deletePreview.value = preview;
 
     if (preview.readonly) {

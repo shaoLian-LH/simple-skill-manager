@@ -81,11 +81,11 @@ describe('TtyPromptAdapter', () => {
   it('uses inquirer confirm with a false default', async () => {
     mockedConfirm.mockResolvedValueOnce(false);
 
-    await expect(adapter.confirm('Delete preset frontend-basic?')).resolves.toBe(false);
+    await expect(adapter.confirm('Remove preset frontend-basic?')).resolves.toBe(false);
 
     expect(mockedConfirm).toHaveBeenCalledOnce();
     expect(mockedConfirm).toHaveBeenCalledWith({
-      message: 'Delete preset frontend-basic?',
+      message: 'Remove preset frontend-basic?',
       default: false,
     });
   });

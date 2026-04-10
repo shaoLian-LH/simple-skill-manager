@@ -212,15 +212,15 @@ function createProgram(deps: CliDependencies = {}): Command {
     });
 
   skillCommand
-    .command('enable [names...]')
-    .description('Enable one or more skills in the selected scope and install them into selected targets.')
+    .command('on [names...]')
+    .description('Turn on one or more skills in the selected scope and install them into selected targets.')
     .option('-t, --target <target>', 'Target root to install into. Repeat to install into multiple targets.', collectTargetsOption, [])
-    .option('--global', 'Enable in global scope instead of the current project.')
+    .option('--global', 'Turn on in global scope instead of the current project.')
     .action(async (names: string[] | undefined, options: { target: string[]; global?: boolean }) => {
       const scope: ActivationScope = options.global ? 'global' : 'project';
       const availableSkills = await withLoadedConfig((skillsDir) => listSkills(skillsDir));
       if ((!names || names.length === 0) && availableSkills.length === 0) {
-        printStdout(renderMessage('No skills are available to enable.'));
+        printStdout(renderMessage('No skills are available to turn on.'));
         return;
       }
       const previousState = await loadScopeState(scope, process.cwd());
@@ -228,9 +228,9 @@ function createProgram(deps: CliDependencies = {}): Command {
         { canPrompt: canPrompt(), prompt },
         names,
         createSkillChoices(availableSkills),
-        'Select skills to enable',
+        'Select skills to turn on',
         'At least one skill name is required in non-interactive mode.',
-        'Run `skm skill enable <name...> --target <target>`.',
+        'Run `skm skill on <name...> --target <target>`.',
         previousState?.enabledSkills ?? [],
       );
 
@@ -245,7 +245,7 @@ function createProgram(deps: CliDependencies = {}): Command {
 
       if (selectedSkills.usedPrompt || selectedTargets.usedPrompt) {
         const confirmed = await prompt.confirm(
-          `Enable skills [${selectedSkills.values.join(', ')}] ${scopeLabel(scope)} with targets [${(selectedTargets.targets.length > 0 ? selectedTargets.targets : defaultTargets).join(', ')}]?`,
+          `Turn on skills [${selectedSkills.values.join(', ')}] ${scopeLabel(scope)} with targets [${(selectedTargets.targets.length > 0 ? selectedTargets.targets : defaultTargets).join(', ')}]?`,
         );
         if (!confirmed) {
           throw new PromptCancelledError();
@@ -262,9 +262,9 @@ function createProgram(deps: CliDependencies = {}): Command {
     });
 
   skillCommand
-    .command('disable [names...]')
-    .description('Disable one or more explicitly enabled skills in the selected scope.')
-    .option('--global', 'Disable from global scope instead of the current project.')
+    .command('off [names...]')
+    .description('Turn off one or more explicitly enabled skills in the selected scope.')
+    .option('--global', 'Turn off from global scope instead of the current project.')
     .action(async (names: string[] | undefined, options: { global?: boolean }) => {
       const scope: ActivationScope = options.global ? 'global' : 'project';
       const previousState = await loadScopeState(scope, process.cwd());
@@ -273,18 +273,18 @@ function createProgram(deps: CliDependencies = {}): Command {
         { canPrompt: canPrompt(), prompt },
         names,
         createNamedChoices(enabledSkills),
-        'Select skills to disable',
+        'Select skills to turn off',
         'At least one skill name is required in non-interactive mode.',
-        'Run `skm skill disable <name...>`.',
+        'Run `skm skill off <name...>`.',
       );
 
       if (selected.values.length === 0) {
-        printStdout(renderMessage('No enabled skills to disable.'));
+        printStdout(renderMessage('No enabled skills to turn off.'));
         return;
       }
 
       if (selected.usedPrompt) {
-        const confirmed = await prompt.confirm(`Disable skills [${selected.values.join(', ')}] from the ${scopeNoun(scope)} scope?`);
+        const confirmed = await prompt.confirm(`Turn off skills [${selected.values.join(', ')}] from the ${scopeNoun(scope)} scope?`);
         if (!confirmed) {
           throw new PromptCancelledError();
         }
@@ -340,10 +340,10 @@ function createProgram(deps: CliDependencies = {}): Command {
     });
 
   presetCommand
-    .command('enable [names...]')
-    .description('Enable one or more presets in the selected scope and install their skills into selected targets.')
+    .command('on [names...]')
+    .description('Turn on one or more presets in the selected scope and install their skills into selected targets.')
     .option('-t, --target <target>', 'Target root to install into. Repeat to install into multiple targets.', collectTargetsOption, [])
-    .option('--global', 'Enable in global scope instead of the current project.')
+    .option('--global', 'Turn on in global scope instead of the current project.')
     .action(async (names: string[] | undefined, options: { target: string[]; global?: boolean }) => {
       const scope: ActivationScope = options.global ? 'global' : 'project';
       const presets = await listPresetDefinitions();
@@ -352,14 +352,14 @@ function createProgram(deps: CliDependencies = {}): Command {
         { canPrompt: canPrompt(), prompt },
         names,
         createPresetChoices(presets),
-        'Select presets to enable',
+        'Select presets to turn on',
         'At least one preset name is required in non-interactive mode.',
-        'Run `skm preset enable <name...> --target <target>`.',
+        'Run `skm preset on <name...> --target <target>`.',
         previousState?.enabledPresets ?? [],
       );
 
       if (selectedPresets.values.length === 0) {
-        printStdout(renderMessage('No presets are available.'));
+        printStdout(renderMessage('No presets are available to turn on.'));
         return;
       }
 
@@ -374,7 +374,7 @@ function createProgram(deps: CliDependencies = {}): Command {
 
       if (selectedPresets.usedPrompt || selectedTargets.usedPrompt) {
         const confirmed = await prompt.confirm(
-          `Enable presets [${selectedPresets.values.join(', ')}] ${scopeLabel(scope)} with targets [${(selectedTargets.targets.length > 0 ? selectedTargets.targets : defaultTargets).join(', ')}]?`,
+          `Turn on presets [${selectedPresets.values.join(', ')}] ${scopeLabel(scope)} with targets [${(selectedTargets.targets.length > 0 ? selectedTargets.targets : defaultTargets).join(', ')}]?`,
         );
         if (!confirmed) {
           throw new PromptCancelledError();
@@ -391,9 +391,9 @@ function createProgram(deps: CliDependencies = {}): Command {
     });
 
   presetCommand
-    .command('disable [names...]')
-    .description('Disable one or more presets in the selected scope.')
-    .option('--global', 'Disable from global scope instead of the current project.')
+    .command('off [names...]')
+    .description('Turn off one or more presets in the selected scope.')
+    .option('--global', 'Turn off from global scope instead of the current project.')
     .action(async (names: string[] | undefined, options: { global?: boolean }) => {
       const scope: ActivationScope = options.global ? 'global' : 'project';
       const previousState = await loadScopeState(scope, process.cwd());
@@ -402,18 +402,18 @@ function createProgram(deps: CliDependencies = {}): Command {
         { canPrompt: canPrompt(), prompt },
         names,
         createNamedChoices(enabledPresets),
-        'Select presets to disable',
+        'Select presets to turn off',
         'At least one preset name is required in non-interactive mode.',
-        'Run `skm preset disable <name...>`.',
+        'Run `skm preset off <name...>`.',
       );
 
       if (selected.values.length === 0) {
-        printStdout(renderMessage('No enabled presets to disable.'));
+        printStdout(renderMessage('No enabled presets to turn off.'));
         return;
       }
 
       if (selected.usedPrompt) {
-        const confirmed = await prompt.confirm(`Disable presets [${selected.values.join(', ')}] from the ${scopeNoun(scope)} scope?`);
+        const confirmed = await prompt.confirm(`Turn off presets [${selected.values.join(', ')}] from the ${scopeNoun(scope)} scope?`);
         if (!confirmed) {
           throw new PromptCancelledError();
         }
@@ -539,8 +539,8 @@ function createProgram(deps: CliDependencies = {}): Command {
     });
 
   presetCommand
-    .command('delete [name]')
-    .description('Delete a preset definition from global presets.yaml.')
+    .command('rm [name]')
+    .description('Remove a preset definition from global presets.yaml.')
     .action(async (name: string | undefined) => {
       const promptContext = { canPrompt: canPrompt(), prompt };
       const presets = await listStaticPresets();
@@ -551,16 +551,16 @@ function createProgram(deps: CliDependencies = {}): Command {
         readonly: false,
       }));
       if (!name && presetDefinitions.length === 0) {
-        printStdout(renderMessage('No presets are available to delete.'));
+        printStdout(renderMessage('No presets are available to remove.'));
         return;
       }
       const collected = await collectSingle(
         promptContext,
         name,
         createPresetChoices(presetDefinitions),
-        'Select a preset to delete',
+        'Select a preset to remove',
         'Preset name is required in non-interactive mode.',
-        'Run `skm preset delete <name>`.',
+        'Run `skm preset rm <name>`.',
       );
       const references = await findPresetReferences(collected.value);
 
@@ -568,7 +568,7 @@ function createProgram(deps: CliDependencies = {}): Command {
         const warning = `Preset ${collected.value} is still referenced by ${references.length} project(s).`;
         if (collected.usedPrompt) {
           printStderr(renderMessage(`Warning: ${warning}`));
-          const confirmedReferenced = await prompt.confirm('Delete it anyway?');
+          const confirmedReferenced = await prompt.confirm('Remove it anyway?');
           if (!confirmedReferenced) {
             throw new PromptCancelledError();
           }
@@ -578,7 +578,7 @@ function createProgram(deps: CliDependencies = {}): Command {
       }
 
       if (collected.usedPrompt) {
-        const confirmed = await prompt.confirm(`Delete preset ${collected.value}?`);
+        const confirmed = await prompt.confirm(`Remove preset ${collected.value}?`);
         if (!confirmed) {
           throw new PromptCancelledError();
         }

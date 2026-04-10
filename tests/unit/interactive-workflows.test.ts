@@ -135,7 +135,7 @@ describe('interactive workflows', () => {
         return true;
       });
 
-      const exitCode = await runCli(['node', 'skm', 'preset', 'delete'], {
+      const exitCode = await runCli(['node', 'skm', 'preset', 'rm'], {
         promptAdapter: new FakePromptAdapter({
           selectOne: ['frontend-v2'],
           confirm: [false],
@@ -207,7 +207,7 @@ describe('interactive workflows', () => {
         confirm: [false],
       });
 
-      const exitCode = await runCli(['node', 'skm', 'skill', 'enable', '--global'], {
+      const exitCode = await runCli(['node', 'skm', 'skill', 'on', '--global'], {
         promptAdapter,
         isInteractiveSession: () => true,
       });
@@ -242,7 +242,7 @@ describe('interactive workflows', () => {
 
         process.chdir(projectDir);
         try {
-          expect(await runCli(['node', 'skm', 'skill', 'enable', 'brainstorming', '--target', '.agents'])).toBe(0);
+          expect(await runCli(['node', 'skm', 'skill', 'on', 'brainstorming', '--target', '.agents'])).toBe(0);
 
           const promptAdapter = new FakePromptAdapter({
             selectMany: [['brainstorming'], ['.agents']],
@@ -250,7 +250,7 @@ describe('interactive workflows', () => {
           });
 
           expect(
-            await runCli(['node', 'skm', 'skill', 'enable'], {
+            await runCli(['node', 'skm', 'skill', 'on'], {
               promptAdapter,
               isInteractiveSession: () => true,
             }),
@@ -284,7 +284,7 @@ describe('interactive workflows', () => {
 
         process.chdir(projectDir);
         try {
-          expect(await runCli(['node', 'skm', 'preset', 'enable', 'frontend-basic', '--target', '.agents'])).toBe(0);
+          expect(await runCli(['node', 'skm', 'preset', 'on', 'frontend-basic', '--target', '.agents'])).toBe(0);
 
           const promptAdapter = new FakePromptAdapter({
             selectMany: [['brainstorming'], ['.agents']],
@@ -292,7 +292,7 @@ describe('interactive workflows', () => {
           });
 
           expect(
-            await runCli(['node', 'skm', 'skill', 'enable'], {
+            await runCli(['node', 'skm', 'skill', 'on'], {
               promptAdapter,
               isInteractiveSession: () => true,
             }),
@@ -320,7 +320,7 @@ describe('interactive workflows', () => {
 
         process.chdir(projectDir);
         try {
-          expect(await runCli(['node', 'skm', 'preset', 'enable', 'frontend-basic', '--target', '.agents'])).toBe(0);
+          expect(await runCli(['node', 'skm', 'preset', 'on', 'frontend-basic', '--target', '.agents'])).toBe(0);
 
           const promptAdapter = new FakePromptAdapter({
             selectMany: [['frontend-basic'], ['.agents']],
@@ -328,7 +328,7 @@ describe('interactive workflows', () => {
           });
 
           expect(
-            await runCli(['node', 'skm', 'preset', 'enable'], {
+            await runCli(['node', 'skm', 'preset', 'on'], {
               promptAdapter,
               isInteractiveSession: () => true,
             }),
@@ -350,7 +350,7 @@ describe('interactive workflows', () => {
       await initConfigWithSkills(homeDir, skillsDir);
 
       vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
-      expect(await runCli(['node', 'skm', 'skill', 'enable', 'brainstorming', '--global', '--target', '.agents'])).toBe(0);
+      expect(await runCli(['node', 'skm', 'skill', 'on', 'brainstorming', '--global', '--target', '.agents'])).toBe(0);
 
       const promptAdapter = new FakePromptAdapter({
         selectMany: [['brainstorming'], ['.agents']],
@@ -358,7 +358,7 @@ describe('interactive workflows', () => {
       });
 
       expect(
-        await runCli(['node', 'skm', 'skill', 'enable', '--global'], {
+        await runCli(['node', 'skm', 'skill', 'on', '--global'], {
           promptAdapter,
           isInteractiveSession: () => true,
         }),

@@ -221,7 +221,7 @@ function assertNoMissingPresetDefinitions(presetNames: string[], presets: Record
 
   throw new SkmError('config', `Preset definitions are missing for ${missing.join(', ')}.`, {
     details: `Failed while ${operation}.`,
-    hint: `Recreate the missing presets or run \`skm preset disable ${missing.join(' ')}\` in this scope.`,
+    hint: `Recreate the missing presets or run \`skm preset off ${missing.join(' ')}\` in this scope.`,
   });
 }
 
@@ -595,7 +595,7 @@ export async function enableSkills(request: EnableSkillsRequest): Promise<Scoped
   const skillNames = stableUnique(request.skillNames);
   if (skillNames.length === 0) {
     throw new SkmError('usage', 'At least one skill name is required.', {
-      hint: 'Run `skm skill enable <name...>`.',
+      hint: 'Run `skm skill on <name...>`.',
     });
   }
 
@@ -619,7 +619,7 @@ export async function disableSkills(request: DisableSkillsRequest): Promise<Scop
   const skillNames = stableUnique(request.skillNames);
   if (skillNames.length === 0) {
     throw new SkmError('usage', 'At least one skill name is required.', {
-      hint: 'Run `skm skill disable <name...>`.',
+      hint: 'Run `skm skill off <name...>`.',
     });
   }
 
@@ -641,7 +641,7 @@ export async function enablePresets(request: EnablePresetsRequest): Promise<Scop
   const presetNames = stableUnique(request.presetNames);
   if (presetNames.length === 0) {
     throw new SkmError('usage', 'At least one preset name is required.', {
-      hint: 'Run `skm preset enable <name...>`.',
+      hint: 'Run `skm preset on <name...>`.',
     });
   }
 
@@ -665,7 +665,7 @@ export async function disablePresets(request: DisablePresetsRequest): Promise<Sc
   const presetNames = stableUnique(request.presetNames);
   if (presetNames.length === 0) {
     throw new SkmError('usage', 'At least one preset name is required.', {
-      hint: 'Run `skm preset disable <name...>`.',
+      hint: 'Run `skm preset off <name...>`.',
     });
   }
 
@@ -777,8 +777,8 @@ function getMissingStateError(scope: ActivationScope): SkmError {
   return new SkmError('config', `${scope === 'global' ? 'Global' : 'Project'} state is missing.`, {
     hint:
       scope === 'global'
-        ? 'Run `skm skill enable --global <name> --target <target>` or `skm preset enable --global <name> --target <target>` first.'
-        : 'Run `skm skill enable <name>` or `skm preset enable <name>` first.',
+        ? 'Run `skm skill on <name> --global --target <target>` or `skm preset on <name> --global --target <target>` first.'
+        : 'Run `skm skill on <name>` or `skm preset on <name>` first.',
   });
 }
 

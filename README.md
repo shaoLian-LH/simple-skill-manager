@@ -78,8 +78,8 @@ skm skill inspect brainstorming
 ### 5. Enable skills or presets
 
 ```bash
-skm skill enable brainstorming --target .agents
-skm preset enable frontend-basic --target .claude
+skm skill on brainstorming --target .agents
+skm preset on frontend-basic --target .claude
 ```
 
 ### 6. Keep installations healthy
@@ -105,10 +105,10 @@ skm doctor
 | --- | --- |
 | `skm skill list` | List all discovered skills from `skillsDir` |
 | `skm skill inspect [name]` | Show one skill's path, frontmatter, and preview |
-| `skm skill enable [names...] --target <target>` | Enable one or more skills in the current project |
-| `skm skill enable [names...] --global --target <target>` | Enable one or more skills in global scope |
-| `skm skill disable [names...]` | Disable project-scoped skills |
-| `skm skill disable [names...] --global` | Disable globally enabled skills |
+| `skm skill on [names...] --target <target>` | Enable one or more skills in the current project |
+| `skm skill on [names...] --global --target <target>` | Enable one or more skills in global scope |
+| `skm skill off [names...]` | Disable project-scoped skills |
+| `skm skill off [names...] --global` | Disable globally enabled skills |
 
 ### `preset`
 
@@ -116,13 +116,13 @@ skm doctor
 | --- | --- |
 | `skm preset list` | List all configured presets |
 | `skm preset inspect [name]` | Show the expanded skill list for one preset |
-| `skm preset enable [names...] --target <target>` | Enable one or more presets in the current project |
-| `skm preset enable [names...] --global --target <target>` | Enable one or more presets in global scope |
-| `skm preset disable [names...]` | Disable project-scoped presets |
-| `skm preset disable [names...] --global` | Disable globally enabled presets |
+| `skm preset on [names...] --target <target>` | Enable one or more presets in the current project |
+| `skm preset on [names...] --global --target <target>` | Enable one or more presets in global scope |
+| `skm preset off [names...]` | Disable project-scoped presets |
+| `skm preset off [names...] --global` | Disable globally enabled presets |
 | `skm preset create [name] [skills...]` | Create a static preset |
 | `skm preset update [name] [skills...]` | Replace a static preset's full skill list |
-| `skm preset delete [name]` | Delete a static preset from `presets.yaml` |
+| `skm preset rm [name]` | Delete a static preset from `presets.yaml` |
 
 ### `sync`, `doctor`, and `ui`
 
@@ -204,7 +204,7 @@ Rules:
 
 Related behavior:
 
-- `skm skill enable ...` and `skm preset enable ...` create or update `.skm/state.json`
+- `skm skill on ...` and `skm preset on ...` create or update `.skm/state.json`
 - Those commands also ensure `.gitignore` contains `.skm`
 - Successful command output is JSON unless the CLI returns a plain message or an error
 

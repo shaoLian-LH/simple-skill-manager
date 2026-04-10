@@ -120,12 +120,12 @@ export function createUiRequestHandler(options: UiRequestHandlerOptions): (reque
         return;
       }
 
-      if (method === 'POST' && pathname === '/api/skills/global/enable') {
+      if (method === 'POST' && pathname === '/api/skills/global/on') {
         sendJson(response, 200, ok(await options.facade.enableGlobalSkills(await readJsonBody(request, locale), locale)));
         return;
       }
 
-      if (method === 'POST' && pathname === '/api/skills/global/disable') {
+      if (method === 'POST' && pathname === '/api/skills/global/off') {
         sendJson(response, 200, ok(await options.facade.disableGlobalSkills(await readJsonBody(request, locale), locale)));
         return;
       }
@@ -164,9 +164,9 @@ export function createUiRequestHandler(options: UiRequestHandlerOptions): (reque
         return;
       }
 
-      const projectSkillEnableMatch = pathname.match(/^\/api\/projects\/([^/]+)\/skills\/enable$/);
-      if (method === 'POST' && projectSkillEnableMatch) {
-        const projectId = decodeURIComponent(projectSkillEnableMatch[1] ?? '');
+      const projectSkillOnMatch = pathname.match(/^\/api\/projects\/([^/]+)\/skills\/on$/);
+      if (method === 'POST' && projectSkillOnMatch) {
+        const projectId = decodeURIComponent(projectSkillOnMatch[1] ?? '');
         sendJson(
           response,
           200,
@@ -175,9 +175,9 @@ export function createUiRequestHandler(options: UiRequestHandlerOptions): (reque
         return;
       }
 
-      const projectSkillDisableMatch = pathname.match(/^\/api\/projects\/([^/]+)\/skills\/disable$/);
-      if (method === 'POST' && projectSkillDisableMatch) {
-        const projectId = decodeURIComponent(projectSkillDisableMatch[1] ?? '');
+      const projectSkillOffMatch = pathname.match(/^\/api\/projects\/([^/]+)\/skills\/off$/);
+      if (method === 'POST' && projectSkillOffMatch) {
+        const projectId = decodeURIComponent(projectSkillOffMatch[1] ?? '');
         sendJson(
           response,
           200,
@@ -186,9 +186,9 @@ export function createUiRequestHandler(options: UiRequestHandlerOptions): (reque
         return;
       }
 
-      const projectPresetEnableMatch = pathname.match(/^\/api\/projects\/([^/]+)\/presets\/enable$/);
-      if (method === 'POST' && projectPresetEnableMatch) {
-        const projectId = decodeURIComponent(projectPresetEnableMatch[1] ?? '');
+      const projectPresetOnMatch = pathname.match(/^\/api\/projects\/([^/]+)\/presets\/on$/);
+      if (method === 'POST' && projectPresetOnMatch) {
+        const projectId = decodeURIComponent(projectPresetOnMatch[1] ?? '');
         sendJson(
           response,
           200,
@@ -197,9 +197,9 @@ export function createUiRequestHandler(options: UiRequestHandlerOptions): (reque
         return;
       }
 
-      const projectPresetDisableMatch = pathname.match(/^\/api\/projects\/([^/]+)\/presets\/disable$/);
-      if (method === 'POST' && projectPresetDisableMatch) {
-        const projectId = decodeURIComponent(projectPresetDisableMatch[1] ?? '');
+      const projectPresetOffMatch = pathname.match(/^\/api\/projects\/([^/]+)\/presets\/off$/);
+      if (method === 'POST' && projectPresetOffMatch) {
+        const projectId = decodeURIComponent(projectPresetOffMatch[1] ?? '');
         sendJson(
           response,
           200,
@@ -234,9 +234,9 @@ export function createUiRequestHandler(options: UiRequestHandlerOptions): (reque
         return;
       }
 
-      const deletePreviewPresetMatch = pathname.match(/^\/api\/presets\/([^/]+)\/delete-preview$/);
-      if (method === 'GET' && deletePreviewPresetMatch) {
-        const presetName = decodeURIComponent(deletePreviewPresetMatch[1] ?? '');
+      const rmPreviewPresetMatch = pathname.match(/^\/api\/presets\/([^/]+)\/rm-preview$/);
+      if (method === 'GET' && rmPreviewPresetMatch) {
+        const presetName = decodeURIComponent(rmPreviewPresetMatch[1] ?? '');
         sendJson(response, 200, ok(await options.facade.getPresetDeletePreview(presetName, locale)));
         return;
       }

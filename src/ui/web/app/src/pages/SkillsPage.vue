@@ -318,13 +318,13 @@ async function toggleSkill(card: SkillCardView): Promise<void> {
 
   try {
     const payload = nextEnabled
-      ? await apiRequest<SkillsApiPayload>('/api/skills/global/enable', {
+      ? await apiRequest<SkillsApiPayload>('/api/skills/global/on', {
           method: 'POST',
           body: JSON.stringify({
             skillNames: [card.name],
           }),
         })
-      : await apiRequest<SkillsApiPayload>('/api/skills/global/disable', {
+      : await apiRequest<SkillsApiPayload>('/api/skills/global/off', {
           method: 'POST',
           body: JSON.stringify({
             skillNames: [card.name],

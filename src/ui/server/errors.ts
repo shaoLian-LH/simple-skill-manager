@@ -121,11 +121,11 @@ function localizeSkmHint(hint: string, locale: UiLocale): string {
       return translateUiText(locale, 'server.upstream.presetNameConflictHint');
     case 'Rename or remove the scope directory to change it, or create a different static preset name in `presets.yaml`.':
       return translateUiText(locale, 'server.upstream.presetReadonlyHint');
-    case 'Run `skm skill enable <name...>`.':
-    case 'Run `skm skill disable <name...>`.':
+    case 'Run `skm skill on <name...>`.':
+    case 'Run `skm skill off <name...>`.':
       return translateUiText(locale, 'server.upstream.skillNameRequiredHint');
-    case 'Run `skm preset enable <name...>`.':
-    case 'Run `skm preset disable <name...>`.':
+    case 'Run `skm preset on <name...>`.':
+    case 'Run `skm preset off <name...>`.':
       return translateUiText(locale, 'server.upstream.presetNameRequiredHint');
     case 'Provide at least one skill name.':
       return translateUiText(locale, 'server.upstream.presetSkillsRequiredHint');
@@ -140,7 +140,7 @@ function localizeSkmHint(hint: string, locale: UiLocale): string {
       }
 
       const presetDefinitionsMissingHintMatch = hint.match(
-        /^Recreate the missing presets or run `skm preset disable (.+)` in this scope\.$/,
+        /^Recreate the missing presets or run `skm preset off (.+)` in this scope\.$/,
       );
       if (presetDefinitionsMissingHintMatch) {
         return translateUiText(locale, 'server.upstream.presetDefinitionsMissingHint', {

@@ -46,8 +46,8 @@ describe.sequential('ui API integration', () => {
         ]);
         await initConfigWithSkills(homeDir, skillsDir);
         await runCli(['preset', 'create', 'frontend-v1', 'brainstorming', 'test-engineer'], { env: { HOME: homeDir } });
-        await runCli(['skill', 'enable', 'brainstorming', '--target', '.agents'], { cwd: projectDir, env: { HOME: homeDir } });
-        await runCli(['preset', 'enable', 'frontend-v1', '--target', '.agents'], { cwd: projectDir, env: { HOME: homeDir } });
+        await runCli(['skill', 'on', 'brainstorming', '--target', '.agents'], { cwd: projectDir, env: { HOME: homeDir } });
+        await runCli(['preset', 'on', 'frontend-v1', '--target', '.agents'], { cwd: projectDir, env: { HOME: homeDir } });
 
         process.env.HOME = homeDir;
         const server = await startUiServer({ preferredPort: 0, launchCwd: projectDir });
@@ -202,8 +202,8 @@ describe.sequential('ui API integration', () => {
         ]);
         await initConfigWithSkills(homeDir, skillsDir);
         await runCli(['preset', 'create', 'frontend-v1', 'brainstorming', 'test-engineer'], { env: { HOME: homeDir } });
-        await runCli(['skill', 'enable', 'brainstorming', '--target', '.agents'], { cwd: projectDir, env: { HOME: homeDir } });
-        await runCli(['preset', 'enable', 'frontend-v1', '--target', '.agents'], { cwd: projectDir, env: { HOME: homeDir } });
+        await runCli(['skill', 'on', 'brainstorming', '--target', '.agents'], { cwd: projectDir, env: { HOME: homeDir } });
+        await runCli(['preset', 'on', 'frontend-v1', '--target', '.agents'], { cwd: projectDir, env: { HOME: homeDir } });
 
         process.env.HOME = homeDir;
         const server = await startUiServer({ preferredPort: 0 });
@@ -216,7 +216,7 @@ describe.sequential('ui API integration', () => {
           const disableSkillResponse = await requestJson<{
             enabledSkills: string[];
             resolvedSkills: Array<{ name: string }>;
-          }>(`${baseUrl}/api/projects/${encodeURIComponent(projectId ?? '')}/skills/disable`, {
+          }>(`${baseUrl}/api/projects/${encodeURIComponent(projectId ?? '')}/skills/off`, {
             method: 'POST',
             headers: {
               'content-type': 'application/json',
@@ -241,7 +241,7 @@ describe.sequential('ui API integration', () => {
           expect(configResponse.body.data.defaultTargets).toEqual(['.agents', '.trae']);
 
           const enableGlobalSkillResponse = await requestJson<{ items: Array<{ name: string; globalEnabled: boolean }> }>(
-            `${baseUrl}/api/skills/global/enable`,
+            `${baseUrl}/api/skills/global/on`,
             {
               method: 'POST',
               headers: {
@@ -349,7 +349,7 @@ describe.sequential('ui API integration', () => {
         ]);
         await initConfigWithSkills(homeDir, skillsDir);
         await runCli(['preset', 'create', 'frontend-v1', 'brainstorming', 'test-engineer'], { env: { HOME: homeDir } });
-        await runCli(['preset', 'enable', 'frontend-v1', '--target', '.agents'], { cwd: projectDir, env: { HOME: homeDir } });
+        await runCli(['preset', 'on', 'frontend-v1', '--target', '.agents'], { cwd: projectDir, env: { HOME: homeDir } });
 
         process.env.HOME = homeDir;
         const server = await startUiServer({ preferredPort: 0 });
@@ -361,7 +361,7 @@ describe.sequential('ui API integration', () => {
             source: string;
             readonly: boolean;
             referenceProjects: Array<{ projectId: string; projectPath: string }>;
-          }>(`${baseUrl}/api/presets/frontend-v1/delete-preview`);
+          }>(`${baseUrl}/api/presets/frontend-v1/rm-preview`);
 
           expect(previewResponse.status).toBe(200);
           expect(previewResponse.body.ok).toBe(true);
@@ -387,7 +387,7 @@ describe.sequential('ui API integration', () => {
         const skillsDir = path.join(homeDir, 'skills-registry');
         await createSkillFixtures(skillsDir, [{ dirName: 'brainstorming', name: 'brainstorming' }]);
         await initConfigWithSkills(homeDir, skillsDir);
-        await runCli(['skill', 'enable', 'brainstorming', '--target', '.agents'], { cwd: projectDir, env: { HOME: homeDir } });
+        await runCli(['skill', 'on', 'brainstorming', '--target', '.agents'], { cwd: projectDir, env: { HOME: homeDir } });
 
         process.env.HOME = homeDir;
         const server = await startUiServer({ preferredPort: 0 });
@@ -456,7 +456,7 @@ describe.sequential('ui API integration', () => {
           { dirName: 'impeccable/polish', name: 'polish' },
         ]);
         await initConfigWithSkills(homeDir, skillsDir);
-        await runCli(['preset', 'enable', 'impeccable', '--target', '.agents'], { cwd: projectDir, env: { HOME: homeDir } });
+        await runCli(['preset', 'on', 'impeccable', '--target', '.agents'], { cwd: projectDir, env: { HOME: homeDir } });
 
         process.env.HOME = homeDir;
         const server = await startUiServer({ preferredPort: 0 });
@@ -494,7 +494,7 @@ describe.sequential('ui API integration', () => {
           ]);
 
           const previewResponse = await requestJson<{ name: string; source: string; readonly: boolean }>(
-            `${baseUrl}/api/presets/impeccable/delete-preview`,
+            `${baseUrl}/api/presets/impeccable/rm-preview`,
           );
           expect(previewResponse.status).toBe(200);
           expect(previewResponse.body.data).toMatchObject({
