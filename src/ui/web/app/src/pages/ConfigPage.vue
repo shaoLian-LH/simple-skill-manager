@@ -265,34 +265,34 @@ onMounted(() => {
 
 <template>
   <section class="space-y-4">
-    <section v-if="isLoading" class="panel text-sm text-ink/70">{{ t('config.loading') }}</section>
+    <section v-if="isLoading" class="muted-panel">{{ t('config.loading') }}</section>
 
     <template v-else>
       <section class="panel">
         <div class="mt-2 grid gap-3 md:grid-cols-2">
-          <div class="rounded-xl border border-ink/10 bg-paper/75 p-3">
-            <p class="text-xs uppercase tracking-[0.12em] text-ink/60">{{ t('config.activeSkillsDir') }}</p>
-            <p class="mt-1 break-all text-sm font-semibold text-ink">
+          <div class="metric-card">
+            <p class="metric-label">{{ t('config.activeSkillsDir') }}</p>
+            <p class="mt-2 break-all text-sm font-semibold leading-6 text-charcoal">
               {{ baselineSummary.skillsDir || t('common.notConfigured') }}
             </p>
           </div>
-          <div class="rounded-xl border border-ink/10 bg-paper/75 p-3">
-            <p class="text-xs uppercase tracking-[0.12em] text-ink/60">{{ t('config.defaultTargets') }}</p>
+          <div class="metric-card">
+            <p class="metric-label">{{ t('config.defaultTargets') }}</p>
             <div class="mt-2 flex flex-wrap gap-2">
               <span
                 v-for="target in baselineSummary.defaultTargets"
                 :key="`baseline-${target}`"
-                class="rounded-full border border-copper/30 bg-copper/10 px-3 py-1 text-xs font-semibold text-copper"
+                class="chip-subtle"
               >
                 {{ target }}
               </span>
-              <span v-if="baselineSummary.defaultTargets.length === 0" class="text-sm text-ink/70">
+              <span v-if="baselineSummary.defaultTargets.length === 0" class="text-sm text-muted">
                 {{ t('config.noDefaultTarget') }}
               </span>
             </div>
           </div>
         </div>
-        <p class="mt-3 text-sm text-ink/70">
+        <p class="mt-4 text-sm leading-6 text-muted">
           {{ t('config.supportedTargets', { count: baselineSummary.supportedTargetCount }) }}
           {{ baselineSummary.usesManualEntry ? t('config.manualEntry') : t('config.pickerAvailable') }}
         </p>
@@ -325,7 +325,7 @@ onMounted(() => {
             </button>
             <button type="button" class="btn-ghost" :disabled="isSaving" @click="copySkillsDir">{{ t('config.copyPath') }}</button>
           </div>
-          <p class="mt-2 text-xs text-ink/70">
+          <p class="mt-2 text-xs text-muted">
             {{ t('config.pickerUnavailableHint') }}
           </p>
         </div>
@@ -337,11 +337,11 @@ onMounted(() => {
               v-for="target in availableTargets"
               :key="`target-${target}`"
               type="button"
-              class="rounded-full border px-3 py-1 text-sm font-semibold transition-colors"
+              class="text-xs"
               :class="
                 draftTargets.includes(target)
-                  ? 'border-copper/30 bg-copper/10 text-copper'
-                  : 'border-ink/20 bg-white/80 text-ink/75 hover:border-copper/20 hover:text-copper'
+                  ? 'chip-solid'
+                  : 'chip'
               "
               :aria-pressed="draftTargets.includes(target)"
               @click="toggleTarget(target)"
@@ -356,27 +356,27 @@ onMounted(() => {
           <button type="button" class="btn-primary" :disabled="isSaving || isPickingFolder" @click="saveConfig">
             {{ isSaving ? t('common.saving') : t('config.saveConfig') }}
           </button>
-          <p v-if="successMessage" class="text-sm text-emerald-700">{{ successMessage }}</p>
+          <p v-if="successMessage" class="text-sm text-muted">{{ successMessage }}</p>
         </div>
-        <p v-if="pageError" class="mt-3 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
+        <p v-if="pageError" class="error-panel mt-3">
           {{ pageError }}
         </p>
       </section>
 
-      <section class="panel bg-white/60">
+      <section class="panel">
         <p class="field-label">{{ t('config.storagePaths') }}</p>
-        <p class="mt-1 text-sm text-ink/70">{{ t('config.storagePathsDescription') }}</p>
-        <ul class="mt-3 space-y-2 text-sm text-ink/75">
+        <p class="mt-2 text-sm leading-6 text-muted">{{ t('config.storagePathsDescription') }}</p>
+        <ul class="mt-4 space-y-3 text-sm leading-6 text-muted">
           <li class="break-all">
-            <span class="font-semibold text-ink">config.json:</span>
+            <span class="font-semibold text-charcoal">config.json:</span>
             {{ baseline?.paths?.configFile || t('config.notAvailable') }}
           </li>
           <li class="break-all">
-            <span class="font-semibold text-ink">presets.yaml:</span>
+            <span class="font-semibold text-charcoal">presets.yaml:</span>
             {{ baseline?.paths?.presetsFile || t('config.notAvailable') }}
           </li>
           <li class="break-all">
-            <span class="font-semibold text-ink">projects.json:</span>
+            <span class="font-semibold text-charcoal">projects.json:</span>
             {{ baseline?.paths?.projectsFile || t('config.notAvailable') }}
           </li>
         </ul>

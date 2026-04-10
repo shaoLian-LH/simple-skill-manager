@@ -228,8 +228,8 @@ onMounted(() => {
 
 <template>
   <section class="space-y-4">
-    <section v-if="loading" class="panel text-sm text-ink/70">{{ t('presetDetail.loading') }}</section>
-    <section v-else-if="errorMessage" class="panel border-red-200 bg-red-50 text-sm text-red-800">
+    <section v-if="loading" class="muted-panel">{{ t('presetDetail.loading') }}</section>
+    <section v-else-if="errorMessage" class="error-panel">
       {{ errorMessage }}
     </section>
     <template v-else-if="detail">
@@ -244,10 +244,7 @@ onMounted(() => {
         </button>
       </div>
 
-      <p
-        v-if="actionMessage"
-        class="rounded-xl border border-copper/30 bg-copper/10 px-3 py-2 text-sm text-ink"
-      >
+      <p v-if="actionMessage" class="notice-panel">
         {{ actionMessage }}
       </p>
 
@@ -256,7 +253,7 @@ onMounted(() => {
           <div class="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
             <div>
               <p class="field-label">{{ t('presetDetail.skillMembership') }}</p>
-              <p class="mt-1 text-sm text-ink/70">{{ t('presetDetail.membershipDescription') }}</p>
+              <p class="mt-2 text-sm leading-6 text-muted">{{ t('presetDetail.membershipDescription') }}</p>
             </div>
             <div class="w-full md:w-[280px]">
               <label class="field-label" for="preset-skill-search">{{ t('common.search') }}</label>
@@ -273,8 +270,8 @@ onMounted(() => {
           <ul v-if="filteredSkillRows.length > 0" class="mt-4 space-y-2">
             <li v-for="skill in filteredSkillRows" :key="skill.name" class="membership-row">
               <div class="min-w-0">
-                <p class="truncate font-semibold text-ink">{{ skill.name }}</p>
-                <p class="mt-1 truncate text-xs text-ink/70">{{ skill.description || skill.path }}</p>
+                <p class="truncate font-semibold text-charcoal">{{ skill.name }}</p>
+                <p class="mt-2 truncate text-xs text-muted">{{ skill.description || skill.path }}</p>
               </div>
               <button
                 type="button"
@@ -294,12 +291,12 @@ onMounted(() => {
               </button>
             </li>
           </ul>
-          <p v-else class="mt-4 text-sm text-ink/70">{{ t('presetDetail.noMatch') }}</p>
+          <p v-else class="mt-4 text-sm text-muted">{{ t('presetDetail.noMatch') }}</p>
         </section>
 
         <aside class="panel">
           <p class="field-label">{{ t('presetDetail.affectedProjects') }}</p>
-          <p class="mt-1 text-sm text-ink/70">
+          <p class="mt-2 text-sm leading-6 text-muted">
             {{ t('presetDetail.affectedProjectsDescription') }}
           </p>
 
@@ -307,16 +304,16 @@ onMounted(() => {
             <li v-for="project in detail.affectedProjects" :key="project.projectId">
               <button type="button" class="project-row" @click="openProjectDetail(project.projectId)">
                 <div class="min-w-0">
-                  <p class="truncate font-semibold text-ink">{{ project.displayName }}</p>
-                  <p class="mt-1 truncate text-xs text-ink/70" :title="project.projectPath">
+                  <p class="truncate font-semibold text-charcoal">{{ project.displayName }}</p>
+                  <p class="mt-2 truncate text-xs text-muted" :title="project.projectPath">
                     {{ project.projectPath }}
                   </p>
                 </div>
-                <span class="text-xs font-semibold text-ink/70">{{ t('common.openProject') }}</span>
+                <span class="text-xs font-semibold text-muted">{{ t('common.openProject') }}</span>
               </button>
             </li>
           </ul>
-          <p v-else class="mt-4 text-sm text-ink/70">{{ t('presetDetail.noAffectedProjects') }}</p>
+          <p v-else class="mt-4 text-sm text-muted">{{ t('presetDetail.noAffectedProjects') }}</p>
         </aside>
       </div>
     </template>
@@ -329,28 +326,36 @@ onMounted(() => {
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
   gap: 0.75rem;
-  border: 1px solid rgba(45, 38, 31, 0.1);
-  border-radius: 0.9rem;
-  background: rgba(255, 255, 255, 0.66);
-  padding: 0.7rem 0.8rem;
+  border: 0;
+  border-radius: 0.75rem;
+  background: #f5f5f5;
+  padding: 0.9rem 1rem;
+  box-shadow:
+    rgba(19, 19, 22, 0.7) 0px 1px 5px -4px,
+    rgba(34, 42, 53, 0.08) 0px 0px 0px 1px;
 }
 
 .project-row {
   width: 100%;
-  border: 1px solid rgba(45, 38, 31, 0.1);
-  border-radius: 0.9rem;
-  background: rgba(247, 238, 227, 0.6);
-  padding: 0.7rem 0.8rem;
+  border: 0;
+  border-radius: 0.75rem;
+  background: #f5f5f5;
+  padding: 0.95rem 1rem;
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
   gap: 0.75rem;
   text-align: left;
-  transition: border-color 160ms ease, background-color 160ms ease;
+  box-shadow:
+    rgba(19, 19, 22, 0.7) 0px 1px 5px -4px,
+    rgba(34, 42, 53, 0.08) 0px 0px 0px 1px;
+  transition:
+    transform 160ms ease,
+    background-color 160ms ease;
 }
 
 .project-row:hover {
-  border-color: rgba(186, 106, 63, 0.35);
-  background: rgba(247, 238, 227, 0.84);
+  background: #efefef;
+  transform: translateY(-1px);
 }
 </style>

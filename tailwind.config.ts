@@ -10,21 +10,33 @@ export default {
   theme: {
     extend: {
       colors: {
-        paper: '#f7eee3',
-        sand: '#e8d6c0',
-        ink: '#2d261f',
-        olive: '#6f7e54',
-        copper: '#ba6a3f',
+        charcoal: '#242424',
+        midnight: '#111111',
+        muted: '#898989',
+        canvas: '#ffffff',
+        subtle: '#f5f5f5',
+        link: '#0099ff',
       },
       fontFamily: {
-        display: ['"Fraunces"', '"Iowan Old Style"', 'serif'],
-        body: ['"Plus Jakarta Sans"', '"Avenir Next"', 'sans-serif'],
+        display: ['"Avenir Next"', '"Inter"', '"Segoe UI"', 'ui-sans-serif', 'system-ui', 'sans-serif'],
+        body: ['"Inter"', 'ui-sans-serif', 'system-ui', '-apple-system', 'BlinkMacSystemFont', '"Segoe UI"', 'sans-serif'],
+        mono: ['"Roboto Mono"', 'ui-monospace', 'SFMono-Regular', 'monospace'],
       },
       boxShadow: {
-        workbench: '0 26px 60px rgba(86, 55, 31, 0.12)',
+        card: 'rgba(19, 19, 22, 0.7) 0px 1px 5px -4px, rgba(34, 42, 53, 0.08) 0px 0px 0px 1px, rgba(34, 42, 53, 0.05) 0px 4px 8px 0px',
+        'card-strong':
+          'rgba(19, 19, 22, 0.72) 0px 1px 6px -4px, rgba(34, 42, 53, 0.08) 0px 0px 0px 1px, rgba(34, 42, 53, 0.08) 0px 18px 36px -18px',
+        surface: 'rgba(34, 42, 53, 0.05) 0px 4px 8px 0px',
+        'inset-highlight': 'rgba(255, 255, 255, 0.15) 0px 2px 0px inset',
       },
       borderRadius: {
-        shell: '28px',
+        button: '8px',
+        card: '12px',
+        shell: '16px',
+        pill: '9999px',
+      },
+      maxWidth: {
+        workbench: '1480px',
       },
     },
   },

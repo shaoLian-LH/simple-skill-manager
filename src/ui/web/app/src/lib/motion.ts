@@ -23,9 +23,9 @@ export function pulseUpdate(element: HTMLElement): void {
 
   element.animate(
     [
-      { boxShadow: '0 0 0 rgba(186, 106, 63, 0)' },
-      { boxShadow: '0 0 0 8px rgba(186, 106, 63, 0.16)' },
-      { boxShadow: '0 0 0 rgba(186, 106, 63, 0)' },
+      { boxShadow: '0 0 0 rgba(59, 130, 246, 0)' },
+      { boxShadow: '0 0 0 8px rgba(59, 130, 246, 0.16)' },
+      { boxShadow: '0 0 0 rgba(59, 130, 246, 0)' },
     ],
     { duration: 420, easing: 'cubic-bezier(0.22, 1, 0.36, 1)' },
   );

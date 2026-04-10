@@ -273,31 +273,28 @@ onMounted(() => {
 
 <template>
   <section class="space-y-4">
-    <section v-if="loading" class="panel text-sm text-ink/70">{{ t('projectDetail.loading') }}</section>
-    <section v-else-if="errorMessage" class="panel border-red-200 bg-red-50 text-sm text-red-800">
+    <section v-if="loading" class="muted-panel">{{ t('projectDetail.loading') }}</section>
+    <section v-else-if="errorMessage" class="error-panel">
       {{ errorMessage }}
     </section>
     <template v-else-if="detail">
-      <p
-        v-if="actionMessage"
-        class="rounded-xl border border-copper/30 bg-copper/10 px-3 py-2 text-sm text-ink"
-      >
+      <p v-if="actionMessage" class="notice-panel">
         {{ actionMessage }}
       </p>
 
       <div class="grid gap-4 xl:grid-cols-[minmax(0,1.45fr)_minmax(0,1fr)]">
         <section class="panel">
           <p class="field-label">{{ t('projectDetail.presets') }}</p>
-          <p class="mt-1 text-sm text-ink/70">{{ t('projectDetail.presetsDescription') }}</p>
+          <p class="mt-2 text-sm leading-6 text-muted">{{ t('projectDetail.presetsDescription') }}</p>
 
           <div class="mt-4 space-y-4">
             <div>
-              <p class="text-xs font-semibold uppercase tracking-[0.11em] text-ink/70">{{ t('projectDetail.enabledSection') }}</p>
+              <p class="field-label">{{ t('projectDetail.enabledSection') }}</p>
               <ul v-if="detail.presetControls.enabled.length > 0" class="mt-2 space-y-2">
                 <li v-for="row in detail.presetControls.enabled" :key="`enabled-preset-${row.name}`" class="control-row">
                   <div class="min-w-0">
-                    <p class="truncate font-semibold text-ink">{{ row.name }}</p>
-                    <p class="mt-1 text-xs text-ink/70">{{ presetMeta(row) }}</p>
+                    <p class="truncate font-semibold text-charcoal">{{ row.name }}</p>
+                    <p class="mt-2 text-xs leading-5 text-muted">{{ presetMeta(row) }}</p>
                   </div>
                   <button
                     type="button"
@@ -309,16 +306,16 @@ onMounted(() => {
                   </button>
                 </li>
               </ul>
-              <p v-else class="mt-2 text-sm text-ink/70">{{ t('projectDetail.noEnabledPresets') }}</p>
+              <p v-else class="mt-2 text-sm text-muted">{{ t('projectDetail.noEnabledPresets') }}</p>
             </div>
 
             <div>
-              <p class="text-xs font-semibold uppercase tracking-[0.11em] text-ink/70">{{ t('projectDetail.availableSection') }}</p>
+              <p class="field-label">{{ t('projectDetail.availableSection') }}</p>
               <ul v-if="detail.presetControls.available.length > 0" class="mt-2 space-y-2">
                 <li v-for="row in detail.presetControls.available" :key="`available-preset-${row.name}`" class="control-row">
                   <div class="min-w-0">
-                    <p class="truncate font-semibold text-ink">{{ row.name }}</p>
-                    <p class="mt-1 text-xs text-ink/70">{{ presetMeta(row) }}</p>
+                    <p class="truncate font-semibold text-charcoal">{{ row.name }}</p>
+                    <p class="mt-2 text-xs leading-5 text-muted">{{ presetMeta(row) }}</p>
                   </div>
                   <button
                     type="button"
@@ -330,7 +327,7 @@ onMounted(() => {
                   </button>
                 </li>
               </ul>
-              <p v-else class="mt-2 text-sm text-ink/70">{{ t('projectDetail.allPresetsEnabled') }}</p>
+              <p v-else class="mt-2 text-sm text-muted">{{ t('projectDetail.allPresetsEnabled') }}</p>
             </div>
           </div>
         </section>
@@ -339,7 +336,7 @@ onMounted(() => {
           <div class="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
             <div>
               <p class="field-label">{{ t('projectDetail.skills') }}</p>
-              <p class="mt-1 text-sm text-ink/70">{{ t('projectDetail.skillsDescription') }}</p>
+              <p class="mt-2 text-sm leading-6 text-muted">{{ t('projectDetail.skillsDescription') }}</p>
             </div>
             <div class="w-full md:w-[280px]">
               <label class="field-label" for="project-skill-search">{{ t('common.search') }}</label>
@@ -355,13 +352,13 @@ onMounted(() => {
 
           <div class="mt-4 space-y-4">
             <div>
-              <p class="text-xs font-semibold uppercase tracking-[0.11em] text-ink/70">{{ t('projectDetail.enabledSection') }}</p>
+              <p class="field-label">{{ t('projectDetail.enabledSection') }}</p>
               <ul v-if="filteredEnabledSkillRows.length > 0" class="mt-2 space-y-2">
                 <li v-for="row in filteredEnabledSkillRows" :key="`enabled-skill-${row.name}`" class="control-row">
                   <div class="min-w-0">
-                    <p class="truncate font-semibold text-ink">{{ row.name }}</p>
-                    <p class="mt-1 text-xs text-ink/70">{{ row.description || row.path }}</p>
-                    <p class="mt-1 text-xs text-ink/60">{{ skillMeta(row) }}</p>
+                    <p class="truncate font-semibold text-charcoal">{{ row.name }}</p>
+                    <p class="mt-2 text-xs leading-5 text-muted">{{ row.description || row.path }}</p>
+                    <p class="mt-1 text-xs text-muted">{{ skillMeta(row) }}</p>
                   </div>
                   <button
                     type="button"
@@ -379,17 +376,17 @@ onMounted(() => {
                   </button>
                 </li>
               </ul>
-              <p v-else class="mt-2 text-sm text-ink/70">{{ t('projectDetail.noEnabledSkillMatch') }}</p>
+              <p v-else class="mt-2 text-sm text-muted">{{ t('projectDetail.noEnabledSkillMatch') }}</p>
             </div>
 
             <div>
-              <p class="text-xs font-semibold uppercase tracking-[0.11em] text-ink/70">{{ t('projectDetail.availableSection') }}</p>
+              <p class="field-label">{{ t('projectDetail.availableSection') }}</p>
               <ul v-if="filteredAvailableSkillRows.length > 0" class="mt-2 space-y-2">
                 <li v-for="row in filteredAvailableSkillRows" :key="`available-skill-${row.name}`" class="control-row">
                   <div class="min-w-0">
-                    <p class="truncate font-semibold text-ink">{{ row.name }}</p>
-                    <p class="mt-1 text-xs text-ink/70">{{ row.description || row.path }}</p>
-                    <p class="mt-1 text-xs text-ink/60">{{ row.reason || t('projectDetail.notEnabled') }}</p>
+                    <p class="truncate font-semibold text-charcoal">{{ row.name }}</p>
+                    <p class="mt-2 text-xs leading-5 text-muted">{{ row.description || row.path }}</p>
+                    <p class="mt-1 text-xs text-muted">{{ row.reason || t('projectDetail.notEnabled') }}</p>
                   </div>
                   <button
                     type="button"
@@ -401,7 +398,7 @@ onMounted(() => {
                   </button>
                 </li>
               </ul>
-              <p v-else class="mt-2 text-sm text-ink/70">{{ t('projectDetail.noAvailableSkillMatch') }}</p>
+              <p v-else class="mt-2 text-sm text-muted">{{ t('projectDetail.noAvailableSkillMatch') }}</p>
             </div>
           </div>
         </section>
@@ -409,23 +406,23 @@ onMounted(() => {
 
       <aside class="panel">
         <p class="field-label">{{ t('projectDetail.resolvedOutcome') }}</p>
-        <p class="mt-1 text-sm text-ink/70">{{ t('projectDetail.resolvedDescription') }}</p>
+        <p class="mt-2 text-sm leading-6 text-muted">{{ t('projectDetail.resolvedDescription') }}</p>
 
         <ul v-if="detail.resolvedSkills.length > 0" class="mt-4 space-y-2">
           <li v-for="row in detail.resolvedSkills" :key="`resolved-${row.name}`" class="resolved-row">
-            <p class="font-semibold text-ink">{{ row.name }}</p>
+            <p class="font-semibold text-charcoal">{{ row.name }}</p>
             <div class="mt-2 flex flex-wrap gap-2">
               <span
                 v-for="label in resolvedLabels(row)"
                 :key="`${row.name}-${label}`"
-                class="rounded-full border border-ink/20 bg-white/80 px-2.5 py-1 text-xs font-semibold text-ink/80"
+                class="chip"
               >
                 {{ label }}
               </span>
             </div>
           </li>
         </ul>
-        <p v-else class="mt-4 text-sm text-ink/70">{{ t('projectDetail.noResolvedSkills') }}</p>
+        <p v-else class="mt-4 text-sm text-muted">{{ t('projectDetail.noResolvedSkills') }}</p>
       </aside>
     </template>
   </section>
@@ -437,16 +434,21 @@ onMounted(() => {
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
   gap: 0.75rem;
-  border: 1px solid rgba(45, 38, 31, 0.1);
-  border-radius: 0.9rem;
-  background: rgba(255, 255, 255, 0.66);
-  padding: 0.75rem 0.85rem;
+  border: 0;
+  border-radius: 0.75rem;
+  background: #f5f5f5;
+  padding: 0.9rem 1rem;
+  box-shadow:
+    rgba(19, 19, 22, 0.7) 0px 1px 5px -4px,
+    rgba(34, 42, 53, 0.08) 0px 0px 0px 1px;
 }
 
 .resolved-row {
-  border: 1px solid rgba(45, 38, 31, 0.1);
-  border-radius: 0.9rem;
-  background: rgba(247, 238, 227, 0.56);
-  padding: 0.8rem 0.9rem;
+  border-radius: 0.75rem;
+  background: #f5f5f5;
+  padding: 1rem;
+  box-shadow:
+    rgba(19, 19, 22, 0.7) 0px 1px 5px -4px,
+    rgba(34, 42, 53, 0.08) 0px 0px 0px 1px;
 }
 </style>

@@ -408,7 +408,7 @@ onMounted(() => {
   <section class="space-y-4">
     <header class="panel">
       <div class="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
-        <p class="text-sm text-ink/70">
+        <p class="text-sm text-muted">
           {{ t('skills.showingCount', { shown: filteredCards.length, total: cards.length }) }}
         </p>
       </div>
@@ -424,18 +424,18 @@ onMounted(() => {
       </div>
     </header>
 
-    <section v-if="loading" class="panel text-sm text-ink/70">{{ t('skills.loading') }}</section>
-    <section v-else-if="loadError" class="panel border-red-200 bg-red-50 text-sm text-red-800">
+    <section v-if="loading" class="muted-panel">{{ t('skills.loading') }}</section>
+    <section v-else-if="loadError" class="error-panel">
       {{ loadError }}
     </section>
-    <section v-else-if="cards.length === 0" class="panel text-sm text-ink/70">
+    <section v-else-if="cards.length === 0" class="muted-panel">
       {{ t('skills.empty') }}
     </section>
-    <section v-else-if="filteredCards.length === 0" class="panel text-sm text-ink/70">
+    <section v-else-if="filteredCards.length === 0" class="muted-panel">
       {{ t('skills.noMatch') }}
     </section>
 
-    <section v-if="actionError" class="panel border-red-200 bg-red-50 text-sm text-red-800">
+    <section v-if="actionError" class="error-panel">
       {{ actionError }}
     </section>
 
@@ -452,24 +452,26 @@ onMounted(() => {
             <div class="skill-card-header">
               <div class="skill-card-header__main">
                 <p class="field-label">{{ t('skills.summaryLabel') }}</p>
-                <h4 class="mt-1 font-display text-2xl text-ink skill-card-title" :title="card.name">{{ card.name }}</h4>
+                <h4 class="mt-2 font-display text-2xl text-charcoal skill-card-title" :title="card.name">{{ card.name }}</h4>
               </div>
               <div class="skill-card-header__actions">
-              <button
-                type="button"
-                class="skill-status-toggle"
-                :class="{ 'skill-status-toggle--enabled': card.globalEnabled }"
-                :aria-pressed="card.globalEnabled"
-                :disabled="isCardPending(card.key)"
-                @keydown.stop
-                @click.stop="toggleSkill(card)"
-              >
-                {{ isCardPending(card.key) ? t('common.updating') : card.globalEnabled ? t('common.enabled') : t('common.disabled') }}
-              </button>
+                <button
+                  type="button"
+                  class="skill-status-toggle"
+                  :class="{ 'skill-status-toggle--enabled': card.globalEnabled }"
+                  :aria-pressed="card.globalEnabled"
+                  :disabled="isCardPending(card.key)"
+                  @keydown.stop
+                  @click.stop="toggleSkill(card)"
+                >
+                  {{
+                    isCardPending(card.key) ? t('common.updating') : card.globalEnabled ? t('common.enabled') : t('common.disabled')
+                  }}
+                </button>
               </div>
             </div>
 
-            <p class="mt-3 text-sm text-ink/75 skills-description-clamp" :title="card.description">{{ card.description }}</p>
+            <p class="mt-3 text-sm leading-6 text-muted skills-description-clamp" :title="card.description">{{ card.description }}</p>
 
             <dl class="mt-4 grid gap-3 md:grid-cols-2">
               <div class="min-w-0">
@@ -493,7 +495,7 @@ onMounted(() => {
               </div>
               <div>
                 <dt class="field-label">{{ t('skills.updated') }}</dt>
-                <dd class="mt-1 text-sm text-ink/75">{{ formatDateTime(card.updatedAt) }}</dd>
+                <dd class="mt-2 text-sm text-muted">{{ formatDateTime(card.updatedAt) }}</dd>
               </div>
             </dl>
           </article>
@@ -508,18 +510,18 @@ onMounted(() => {
             <div class="flex items-start justify-between gap-3">
               <div>
                 <p class="field-label">{{ t('skills.intersection') }}</p>
-                <h4 class="mt-1 font-display text-2xl text-ink" :title="card.name">{{ card.name }}</h4>
+                <h4 class="mt-2 font-display text-2xl text-charcoal" :title="card.name">{{ card.name }}</h4>
               </div>
             </div>
 
             <div class="mt-4 grid gap-4 md:grid-cols-2">
-              <section class="rounded-xl border border-ink/10 bg-white/70 p-3">
+              <section class="rounded-card bg-subtle p-4 shadow-card">
                 <p class="field-label">{{ t('skills.directProjects') }}</p>
                 <ul v-if="card.directProjects.length > 0" class="mt-2 space-y-2">
                   <li
                     v-for="project in card.directProjects"
                     :key="`direct-${card.key}-${project.id}`"
-                    class="rounded-lg border border-ink/10 bg-paper/80 px-3 py-2 text-sm text-ink/80"
+                    class="rounded-card bg-canvas px-3 py-3 text-sm text-charcoal shadow-card"
                   >
                     <button
                       type="button"
@@ -533,18 +535,18 @@ onMounted(() => {
                     </button>
                   </li>
                 </ul>
-                <p v-else class="mt-2 text-sm text-ink/70">
+                <p v-else class="mt-2 text-sm text-muted">
                   {{ t('skills.noDirectProjects') }}
                 </p>
               </section>
 
-              <section class="rounded-xl border border-ink/10 bg-white/70 p-3">
+              <section class="rounded-card bg-subtle p-4 shadow-card">
                 <p class="field-label">{{ t('skills.viaPreset') }}</p>
                 <ul v-if="card.viaPresetProjects.length > 0" class="mt-2 space-y-2">
                   <li
                     v-for="project in card.viaPresetProjects"
                     :key="`preset-${card.key}-${project.id}`"
-                    class="rounded-lg border border-ink/10 bg-paper/80 px-3 py-2 text-sm text-ink/80"
+                    class="rounded-card bg-canvas px-3 py-3 text-sm text-charcoal shadow-card"
                   >
                     <button
                       type="button"
@@ -556,10 +558,10 @@ onMounted(() => {
                     >
                       {{ isProjectPending(`${card.key}::${project.id}`) ? t('common.opening') : project.displayLabel }}
                     </button>
-                    <p v-if="project.note" class="text-xs text-ink/60">{{ project.note }}</p>
+                    <p v-if="project.note" class="mt-2 text-xs leading-5 text-muted">{{ project.note }}</p>
                   </li>
                 </ul>
-                <p v-else class="mt-2 text-sm text-ink/70">
+                <p v-else class="mt-2 text-sm text-muted">
                   {{ t('skills.noViaPresetProjects') }}
                 </p>
               </section>
@@ -601,8 +603,10 @@ onMounted(() => {
 }
 
 .skill-face-clickable:focus-visible {
-  outline: 2px solid rgba(176, 93, 54, 0.5);
-  outline-offset: 3px;
+  box-shadow:
+    rgba(19, 19, 22, 0.7) 0px 1px 5px -4px,
+    rgba(34, 42, 53, 0.08) 0px 0px 0px 1px,
+    0 0 0 4px rgba(59, 130, 246, 0.16);
 }
 
 .skill-face-front {
@@ -647,17 +651,17 @@ onMounted(() => {
   padding: 0;
   border: 0;
   background: transparent;
-  color: rgba(176, 93, 54, 0.96);
+  color: #0099ff;
   text-align: left;
   cursor: pointer;
   text-decoration: underline;
-  text-decoration-color: rgba(176, 93, 54, 0.28);
+  text-decoration-color: rgba(0, 153, 255, 0.35);
   text-underline-offset: 0.22rem;
 }
 
 .skill-location-button:hover:not(:disabled) {
-  color: rgba(45, 38, 31, 0.86);
-  text-decoration-color: rgba(176, 93, 54, 0.7);
+  color: #111111;
+  text-decoration-color: rgba(0, 153, 255, 0.9);
 }
 
 .skill-location-button:disabled {
@@ -688,13 +692,13 @@ onMounted(() => {
   font-weight: 600;
   text-align: left;
   text-decoration: underline;
-  text-decoration-color: rgba(176, 93, 54, 0.22);
+  text-decoration-color: rgba(0, 153, 255, 0.3);
   text-underline-offset: 0.22rem;
 }
 
 .skill-related-project-button:hover:not(:disabled) {
-  color: rgba(45, 38, 31, 0.92);
-  text-decoration-color: rgba(176, 93, 54, 0.62);
+  color: #111111;
+  text-decoration-color: rgba(0, 153, 255, 0.9);
 }
 
 .skill-related-project-button:disabled {

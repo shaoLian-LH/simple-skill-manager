@@ -173,7 +173,7 @@ onMounted(() => {
   <section class="space-y-4">
     <header class="panel">
       <div class="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
-        <p class="text-sm text-ink/70">
+        <p class="text-sm text-muted">
           {{ t('projects.showingCount', { shown: filteredRows.length, total: rows.length }) }}
         </p>
       </div>
@@ -190,23 +190,23 @@ onMounted(() => {
       </div>
     </header>
 
-    <section v-if="loading" class="panel text-sm text-ink/70">{{ t('projects.loading') }}</section>
-    <section v-else-if="errorMessage" class="panel border-red-200 bg-red-50 text-sm text-red-800">
+    <section v-if="loading" class="muted-panel">{{ t('projects.loading') }}</section>
+    <section v-else-if="errorMessage" class="error-panel">
       {{ errorMessage }}
     </section>
-    <section v-else-if="rows.length === 0" class="panel text-sm text-ink/70">
+    <section v-else-if="rows.length === 0" class="muted-panel">
       {{ t('projects.empty') }}
     </section>
-    <section v-else-if="filteredRows.length === 0" class="panel text-sm text-ink/70">
+    <section v-else-if="filteredRows.length === 0" class="muted-panel">
       {{ t('projects.noMatch') }}
     </section>
-    <ul v-else class="panel divide-y divide-ink/10 p-0">
+    <ul v-else class="overflow-hidden rounded-shell bg-canvas p-0 shadow-card divide-y divide-charcoal/10">
       <li v-for="row in filteredRows" :key="row.projectId" class="index-row">
         <button type="button" class="index-row-main" @click="openProjectDetail(row.projectId)">
           <div class="min-w-0">
-            <p class="truncate font-semibold text-ink">{{ getProjectName(row.projectPath) }}</p>
-            <p class="truncate text-sm text-ink/70" :title="row.projectPath">{{ row.projectPath }}</p>
-            <p class="mt-1 text-xs text-ink/70">
+            <p class="truncate font-semibold text-charcoal">{{ getProjectName(row.projectPath) }}</p>
+            <p class="truncate text-sm text-muted" :title="row.projectPath">{{ row.projectPath }}</p>
+            <p class="mt-2 text-xs leading-5 text-muted">
               {{
                 row.targets.length > 0 ? row.targets.join(', ') : t('projects.noTargets')
               }}
@@ -234,7 +234,7 @@ onMounted(() => {
       </li>
     </ul>
 
-    <p v-if="hintMessage" class="rounded-xl border border-copper/30 bg-copper/10 px-3 py-2 text-sm text-ink">
+    <p v-if="hintMessage" class="notice-panel">
       {{ hintMessage }}
     </p>
   </section>
@@ -255,12 +255,12 @@ onMounted(() => {
   background: transparent;
   text-align: left;
   cursor: pointer;
-  border-radius: 0.85rem;
-  padding: 0.35rem 0.4rem;
+  border-radius: 0.75rem;
+  padding: 0.5rem 0.625rem;
   transition: background-color 150ms ease;
 }
 
 .index-row-main:hover {
-  background: rgba(186, 106, 63, 0.1);
+  background: rgba(36, 36, 36, 0.05);
 }
 </style>

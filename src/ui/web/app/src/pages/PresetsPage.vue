@@ -80,7 +80,7 @@ onMounted(() => {
   <section class="space-y-4">
     <header class="panel">
       <div class="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
-        <p class="text-sm text-ink/70">
+        <p class="text-sm text-muted">
           {{ t('presets.showingCount', { shown: filteredPresets.length, total: presets.length }) }}
         </p>
       </div>
@@ -97,36 +97,35 @@ onMounted(() => {
       </div>
     </header>
 
-    <section v-if="loading" class="panel text-sm text-ink/70">{{ t('presets.loading') }}</section>
-    <section v-else-if="errorMessage" class="panel border-red-200 bg-red-50 text-sm text-red-800">
+    <section v-if="loading" class="muted-panel">{{ t('presets.loading') }}</section>
+    <section v-else-if="errorMessage" class="error-panel">
       {{ errorMessage }}
     </section>
-    <section v-else-if="presets.length === 0" class="panel text-sm text-ink/70">
+    <section v-else-if="presets.length === 0" class="muted-panel">
       {{ t('presets.empty') }}
     </section>
-    <section v-else-if="filteredPresets.length === 0" class="panel text-sm text-ink/70">
+    <section v-else-if="filteredPresets.length === 0" class="muted-panel">
       {{ t('presets.noMatch') }}
     </section>
     <ul v-else class="space-y-2">
       <li v-for="preset in filteredPresets" :key="preset.name">
         <button type="button" class="preset-index-row" @click="openPresetDetail(preset.name)">
           <div class="min-w-0">
-            <p class="truncate font-semibold text-ink">{{ preset.name }}</p>
-            <p class="mt-1 text-xs text-ink/70">{{ formatSummary(preset) }}</p>
+            <p class="truncate font-semibold text-charcoal">{{ preset.name }}</p>
+            <p class="mt-2 text-xs text-muted">{{ formatSummary(preset) }}</p>
           </div>
           <span
-            class="rounded-full border px-2.5 py-1 text-xs font-semibold"
             :class="
               preset.readonly
-                ? 'border-ink/25 bg-white/80 text-ink/80'
+                ? 'chip'
                 : preset.source === 'dynamic'
-                  ? 'border-olive/40 bg-olive/10 text-olive'
-                  : 'border-copper/40 bg-copper/10 text-copper'
+                  ? 'chip-subtle'
+                  : 'chip-solid'
             "
           >
             {{ sourceStateLabel(locale, preset.source, preset.readonly) }}
           </span>
-          <span class="text-xs font-semibold text-ink/70">{{ t('common.openDetail') }}</span>
+          <span class="text-xs font-semibold text-muted">{{ t('common.openDetail') }}</span>
         </button>
       </li>
     </ul>
@@ -136,20 +135,26 @@ onMounted(() => {
 <style scoped>
 .preset-index-row {
   width: 100%;
-  border: 1px solid rgba(45, 38, 31, 0.1);
-  border-radius: 0.9rem;
-  background: rgba(255, 255, 255, 0.66);
-  padding: 0.75rem 0.85rem;
+  border: 0;
+  border-radius: 1rem;
+  background: #ffffff;
+  padding: 1rem 1.1rem;
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto auto;
   align-items: center;
   gap: 0.75rem;
   text-align: left;
-  transition: border-color 160ms ease, background-color 160ms ease;
+  box-shadow:
+    rgba(19, 19, 22, 0.7) 0px 1px 5px -4px,
+    rgba(34, 42, 53, 0.08) 0px 0px 0px 1px,
+    rgba(34, 42, 53, 0.05) 0px 4px 8px 0px;
+  transition:
+    transform 160ms ease,
+    background-color 160ms ease;
 }
 
 .preset-index-row:hover {
-  border-color: rgba(186, 106, 63, 0.35);
-  background: rgba(247, 238, 227, 0.82);
+  background: #f5f5f5;
+  transform: translateY(-1px);
 }
 </style>

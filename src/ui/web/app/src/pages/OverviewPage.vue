@@ -248,9 +248,9 @@ onMounted(() => {
 
 <template>
   <section class="space-y-4">
-    <section v-if="loading" class="panel text-sm text-ink/70">{{ t('overview.loading') }}</section>
+    <section v-if="loading" class="muted-panel">{{ t('overview.loading') }}</section>
 
-    <section v-else-if="errorMessage" class="panel border-red-200 bg-red-50 text-sm text-red-800">
+    <section v-else-if="errorMessage" class="error-panel">
       <p>{{ errorMessage }}</p>
       <button type="button" class="btn-secondary mt-3" @click="loadOverview">{{ t('common.retry') }}</button>
     </section>
@@ -259,12 +259,12 @@ onMounted(() => {
       <section class="space-y-3">
         <div class="flex items-center justify-between">
           <p class="field-label">{{ t('overview.recommendedActions') }}</p>
-          <p class="text-xs text-ink/60">{{ t('overview.actionsCount', { count: model.recommendedActions.length }) }}</p>
+          <p class="text-xs text-muted">{{ t('overview.actionsCount', { count: model.recommendedActions.length }) }}</p>
         </div>
         <ul class="overview-action-grid">
           <li v-for="action in model.recommendedActions.slice(0, 3)" :key="action.id" class="overview-action-card">
-            <p class="font-semibold text-ink">{{ action.label }}</p>
-            <p class="mt-1 text-sm text-ink/70">{{ action.description }}</p>
+            <p class="font-semibold text-charcoal">{{ action.label }}</p>
+            <p class="mt-2 text-sm leading-6 text-muted">{{ action.description }}</p>
             <button
               type="button"
               :class="action.primary ? 'btn-primary mt-3' : 'btn-secondary mt-3'"
@@ -279,17 +279,17 @@ onMounted(() => {
       <section class="panel">
         <p class="field-label">{{ t('overview.globalOverview') }}</p>
         <div class="mt-3 grid gap-3 md:grid-cols-3">
-          <article class="rounded-xl border border-ink/10 bg-white/70 p-3">
-            <p class="text-xs uppercase tracking-[0.12em] text-ink/60">{{ t('nav.projects') }}</p>
-            <p class="mt-1 text-2xl font-display text-ink">{{ model.totals.projects }}</p>
+          <article class="metric-card">
+            <p class="metric-label">{{ t('nav.projects') }}</p>
+            <p class="metric-value">{{ model.totals.projects }}</p>
           </article>
-          <article class="rounded-xl border border-ink/10 bg-white/70 p-3">
-            <p class="text-xs uppercase tracking-[0.12em] text-ink/60">{{ t('nav.presets') }}</p>
-            <p class="mt-1 text-2xl font-display text-ink">{{ model.totals.presets }}</p>
+          <article class="metric-card">
+            <p class="metric-label">{{ t('nav.presets') }}</p>
+            <p class="metric-value">{{ model.totals.presets }}</p>
           </article>
-          <article class="rounded-xl border border-ink/10 bg-white/70 p-3">
-            <p class="text-xs uppercase tracking-[0.12em] text-ink/60">{{ t('nav.skills') }}</p>
-            <p class="mt-1 text-2xl font-display text-ink">{{ model.totals.skills }}</p>
+          <article class="metric-card">
+            <p class="metric-label">{{ t('nav.skills') }}</p>
+            <p class="metric-value">{{ model.totals.skills }}</p>
           </article>
         </div>
       </section>
@@ -303,13 +303,13 @@ onMounted(() => {
           <li
             v-for="project in model.recentProjects.slice(0, 5)"
             :key="project.projectId"
-            class="rounded-xl border border-ink/10 bg-paper/80 p-3"
+            class="rounded-card bg-subtle p-4 shadow-card"
           >
             <div class="flex items-start justify-between gap-3">
               <div>
-                <p class="font-semibold text-ink">{{ formatProjectName(project.projectPath) }}</p>
-                <p class="mt-1 break-all text-xs text-ink/70">{{ project.projectPath }}</p>
-                <p class="mt-1 text-xs text-ink/70">
+                <p class="font-semibold text-charcoal">{{ formatProjectName(project.projectPath) }}</p>
+                <p class="mt-2 break-all text-xs leading-5 text-muted">{{ project.projectPath }}</p>
+                <p class="mt-2 text-xs leading-5 text-muted">
                   {{
                     t('overview.skillPresetSummary', {
                       skillCount: project.enabledSkillCount,
@@ -319,7 +319,7 @@ onMounted(() => {
                 </p>
               </div>
               <div class="text-right">
-                <p class="text-xs text-ink/60">{{ formatDateTime(project.updatedAt) }}</p>
+                <p class="text-xs text-muted">{{ formatDateTime(project.updatedAt) }}</p>
                 <button type="button" class="btn-ghost mt-2" @click="openProject(project.projectId)">
                   {{ t('common.open') }}
                 </button>
@@ -327,7 +327,7 @@ onMounted(() => {
             </div>
           </li>
         </ul>
-        <p v-else class="mt-2 rounded-xl border border-dashed border-ink/20 p-3 text-sm text-ink/70">
+        <p v-else class="mt-2 rounded-card bg-subtle p-4 text-sm text-muted shadow-card">
           {{ t('overview.noTrackedProjects') }}
         </p>
       </section>

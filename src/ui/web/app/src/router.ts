@@ -27,14 +27,14 @@ function createMissingPage(labelKey: RouteTitleKey): Component {
           h('p', { class: 'field-label' }, translateUiText(getCurrentUiLocale(), labelKey)),
           h(
             'h3',
-            { class: 'mt-2 font-display text-2xl text-ink' },
+            { class: 'mt-2 font-display text-2xl text-charcoal' },
             translateUiText(getCurrentUiLocale(), 'router.missing.notReady', {
               label: translateUiText(getCurrentUiLocale(), labelKey),
             }),
           ),
           h(
             'p',
-            { class: 'mt-2 text-sm text-ink/70' },
+            { class: 'mt-2 text-sm text-muted' },
             translateUiText(getCurrentUiLocale(), 'router.missing.autoAppear'),
           ),
         ]);
@@ -60,10 +60,10 @@ const NotFoundPage: Component = {
     return () =>
       h('section', { class: 'panel' }, [
         h('p', { class: 'field-label' }, translateUiText(getCurrentUiLocale(), 'router.notFound.label')),
-        h('h3', { class: 'mt-2 font-display text-2xl text-ink' }, translateUiText(getCurrentUiLocale(), 'router.notFound.title')),
+        h('h3', { class: 'mt-2 font-display text-2xl text-charcoal' }, translateUiText(getCurrentUiLocale(), 'router.notFound.title')),
         h(
           'p',
-          { class: 'mt-2 text-sm text-ink/70' },
+          { class: 'mt-2 text-sm text-muted' },
           translateUiText(getCurrentUiLocale(), 'router.notFound.description'),
         ),
       ]);
