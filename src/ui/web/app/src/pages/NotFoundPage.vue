@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import CenteredEmptyState from '../components/CenteredEmptyState.vue';
 import { useWorkspaceSpine } from '../lib/chrome';
 import { useUiI18n } from '../lib/i18n';
 
@@ -10,11 +11,5 @@ useWorkspaceSpine(() => ({
 </script>
 
 <template>
-  <section class="workspace-page workspace-page--centered">
-    <div class="empty-state">
-      <p class="eyebrow">{{ t('notFound.eyebrow') }}</p>
-      <h3 class="section-title">{{ t('notFound.title') }}</h3>
-      <p class="section-copy">{{ t('notFound.copy') }}</p>
-    </div>
-  </section>
+  <CenteredEmptyState :eyebrow="t('notFound.eyebrow')" :title="t('notFound.title')" :copy="t('notFound.copy')" />
 </template>

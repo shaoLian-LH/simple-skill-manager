@@ -1,10 +1,14 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue';
-import { useRouter } from 'vue-router';
 
-import { ApiRequestError, apiRequest } from '../lib/api';
+import PageStatePanel from '../components/PageStatePanel.vue';
+import { apiRequest } from '../lib/api';
 import { useSetQuickActions, useWorkspaceSpine } from '../lib/chrome';
+import { asNumber, asRecord, asString } from '../lib/coerce';
+import { getProjectLabel } from '../lib/format';
 import { useUiI18n } from '../lib/i18n';
+import { useLocalizedNavigation } from '../lib/navigation';
+import { resolveRequestErrorMessage } from '../lib/page';
 
 interface BootPayload {
   launchCwd?: unknown;
@@ -42,9 +46,9 @@ interface OverviewModel {
   recentProjects: ProjectSummary[];
 }
 
-const router = useRouter();
 const setQuickActions = useSetQuickActions();
-const { t, formatDateTime, withLocalePath } = useUiI18n();
+const { t, formatDateTime } = useUiI18n();
+const { pushPath } = useLocalizedNavigation();
 
 const loading = ref(true);
 const errorMessage = ref('');
@@ -59,30 +63,14 @@ useWorkspaceSpine(() => ({
       : model.value?.nextAction || t('app.routeDesc.overview'),
 }));
 
-function toRecord(value: unknown): Record<string, unknown> | null {
-  if (typeof value !== 'object' || value === null) {
-    return null;
-  }
-
-  return value as Record<string, unknown>;
-}
-
-function toString(value: unknown, fallback = ''): string {
-  return typeof value === 'string' ? value : fallback;
-}
-
-function toNumber(value: unknown, fallback = 0): number {
-  return typeof value === 'number' && Number.isFinite(value) ? value : fallback;
-}
-
 function toProjectSummary(entry: unknown): ProjectSummary | null {
-  const record = toRecord(entry);
+  const record = asRecord(entry);
   if (!record) {
     return null;
   }
 
-  const projectId = toString(record.projectId);
-  const projectPath = toString(record.projectPath);
+  const projectId = asString(record.projectId);
+  const projectPath = asString(record.projectPath);
   if (!projectId || !projectPath) {
     return null;
   }
@@ -90,64 +78,58 @@ function toProjectSummary(entry: unknown): ProjectSummary | null {
   return {
     projectId,
     projectPath,
-    enabledSkillCount: toNumber(record.enabledSkillCount),
-    enabledPresetCount: toNumber(record.enabledPresetCount),
-    updatedAt: toString(record.updatedAt),
+    enabledSkillCount: asNumber(record.enabledSkillCount),
+    enabledPresetCount: asNumber(record.enabledPresetCount),
+    updatedAt: asString(record.updatedAt),
   };
 }
 
-function formatProjectName(projectPath: string): string {
-  const normalized = projectPath.replace(/\\/g, '/');
-  const tail = normalized.split('/').filter(Boolean).at(-1);
-  return tail || projectPath;
-}
-
 function normalizeBoot(boot: BootPayload | null): { launchCwd: string; matchedProjectId: string | null } {
-  const launchCwd = toString(boot?.launchCwd, '');
-  const matchedProjectId = toString(boot?.matchedProjectId, '') || null;
+  const launchCwd = asString(boot?.launchCwd, '');
+  const matchedProjectId = asString(boot?.matchedProjectId, '') || null;
   return { launchCwd, matchedProjectId };
 }
 
 function normalizeOverviewPayload(raw: unknown, boot: BootPayload | null): OverviewModel {
-  const record = toRecord(raw) ?? {};
+  const record = asRecord(raw) ?? {};
   const bootInfo = normalizeBoot(boot);
 
-  const totalsRecord = toRecord(record.totals) ?? {};
+  const totalsRecord = asRecord(record.totals) ?? {};
   const totals = {
-    projects: toNumber(totalsRecord.projects),
-    presets: toNumber(totalsRecord.presets),
-    skills: toNumber(totalsRecord.skills),
+    projects: asNumber(totalsRecord.projects),
+    presets: asNumber(totalsRecord.presets),
+    skills: asNumber(totalsRecord.skills),
   };
 
   const recentProjects = Array.isArray(record.recentProjects)
     ? record.recentProjects.map((entry) => toProjectSummary(entry)).filter((entry): entry is ProjectSummary => entry !== null)
     : [];
 
-  const matchedProjectRecord = toRecord(record.matchedProject);
-  const matchedProjectId = toString(matchedProjectRecord?.projectId) || bootInfo.matchedProjectId;
-  const matchedProjectPath = toString(matchedProjectRecord?.projectPath);
+  const matchedProjectRecord = asRecord(record.matchedProject);
+  const matchedProjectId = asString(matchedProjectRecord?.projectId) || bootInfo.matchedProjectId;
+  const matchedProjectPath = asString(matchedProjectRecord?.projectPath);
   const matchedProjectLabel =
-    toString(matchedProjectRecord?.displayName) ||
-    toString(matchedProjectRecord?.name) ||
-    (matchedProjectPath ? formatProjectName(matchedProjectPath) : matchedProjectId || t('common.noMatch'));
+    asString(matchedProjectRecord?.displayName) ||
+    asString(matchedProjectRecord?.name) ||
+    (matchedProjectPath ? getProjectLabel(matchedProjectPath) : matchedProjectId || t('common.noMatch'));
 
-  const primaryScopeRecord = toRecord(record.primaryScope);
-  const primaryScope = toString(primaryScopeRecord?.label, matchedProjectId ? t('common.scopeProject') : t('common.scopeGlobal'));
+  const primaryScopeRecord = asRecord(record.primaryScope);
+  const primaryScope = asString(primaryScopeRecord?.label, matchedProjectId ? t('common.scopeProject') : t('common.scopeGlobal'));
 
   const recommendedActions = (Array.isArray(record.recommendedActions) ? record.recommendedActions : [])
     .map((entry, index) => {
-      const item = toRecord(entry) ?? {};
-      const to = toString(item.to) || toString(item.route);
+      const item = asRecord(entry) ?? {};
+      const to = asString(item.to) || asString(item.route);
       if (!to) {
         return null;
       }
 
       return {
-        id: toString(item.id, `action-${index + 1}`),
-        label: toString(item.label, t('common.open')),
-        description: toString(item.description),
+        id: asString(item.id, `action-${index + 1}`),
+        label: asString(item.label, t('common.open')),
+        description: asString(item.description),
         to,
-        primary: toString(item.emphasis, 'secondary') === 'primary' || Boolean(item.primary),
+        primary: asString(item.emphasis, 'secondary') === 'primary' || Boolean(item.primary),
       } satisfies ActionItem;
     })
     .filter((entry): entry is ActionItem => entry !== null)
@@ -202,7 +184,7 @@ function normalizeOverviewPayload(raw: unknown, boot: BootPayload | null): Overv
       ];
 
   return {
-    launchCwd: toString(record.launchCwd, bootInfo.launchCwd),
+    launchCwd: asString(record.launchCwd, bootInfo.launchCwd),
     matchedProjectLabel,
     matchedProjectId,
     primaryScope,
@@ -223,22 +205,18 @@ async function loadOverview(): Promise<void> {
     const overviewPayload = await apiRequest<unknown>('/api/overview');
     model.value = normalizeOverviewPayload(overviewPayload, boot);
   } catch (error) {
-    if (error instanceof ApiRequestError) {
-      errorMessage.value = error.detail.message;
-    } else {
-      errorMessage.value = t('overview.loadFailed');
-    }
+    errorMessage.value = resolveRequestErrorMessage(error, t('overview.loadFailed'));
   } finally {
     loading.value = false;
   }
 }
 
 function openAction(to: string): void {
-  void router.push(withLocalePath(to));
+  void pushPath(to);
 }
 
 function openProject(projectId: string): void {
-  void router.push(withLocalePath(`/projects/${encodeURIComponent(projectId)}`));
+  void pushPath(`/projects/${encodeURIComponent(projectId)}`);
 }
 
 onMounted(() => {
@@ -248,12 +226,14 @@ onMounted(() => {
 
 <template>
   <section class="space-y-4">
-    <section v-if="loading" class="muted-panel">{{ t('overview.loading') }}</section>
+    <PageStatePanel v-if="loading">{{ t('overview.loading') }}</PageStatePanel>
 
-    <section v-else-if="errorMessage" class="error-panel">
+    <PageStatePanel v-else-if="errorMessage" tone="error">
       <p>{{ errorMessage }}</p>
-      <button type="button" class="btn-secondary mt-3" @click="loadOverview">{{ t('common.retry') }}</button>
-    </section>
+      <template #actions>
+        <button type="button" class="btn-secondary" @click="loadOverview">{{ t('common.retry') }}</button>
+      </template>
+    </PageStatePanel>
 
     <template v-else-if="model">
       <section class="space-y-3">
@@ -304,7 +284,7 @@ onMounted(() => {
           >
             <div class="recent-project-card__body">
               <div class="min-w-0">
-                <p class="font-semibold text-charcoal">{{ formatProjectName(project.projectPath) }}</p>
+                <p class="font-semibold text-charcoal">{{ getProjectLabel(project.projectPath) }}</p>
                 <p class="recent-project-card__path mt-2 text-xs leading-5 text-muted" :title="project.projectPath">
                   {{ project.projectPath }}
                 </p>

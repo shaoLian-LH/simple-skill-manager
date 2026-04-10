@@ -1,9 +1,14 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
 
-import { ApiRequestError, apiRequest } from '../lib/api';
+import PageSearchBar from '../components/PageSearchBar.vue';
+import PageStatePanel from '../components/PageStatePanel.vue';
+import { apiRequest } from '../lib/api';
 import { useSetQuickActions, useWorkspaceSpine } from '../lib/chrome';
+import { asBoolean, asRecord, asString, asStringArray } from '../lib/coerce';
+import { getLastPathSegment } from '../lib/format';
 import { useUiI18n } from '../lib/i18n';
+import { resolveRequestErrorMessage, usePendingSet } from '../lib/page';
 
 interface ProjectIntersectionView {
   id: string;
@@ -43,9 +48,21 @@ const actionError = ref('');
 const searchQuery = ref('');
 const cards = ref<SkillCardView[]>([]);
 const flippedCards = ref<Set<string>>(new Set());
-const pendingCardKeys = ref<Set<string>>(new Set());
-const pendingLocationKeys = ref<Set<string>>(new Set());
-const pendingProjectKeys = ref<Set<string>>(new Set());
+const {
+  isPending: isCardPending,
+  resetPending: resetCardPending,
+  setPending: setCardPending,
+} = usePendingSet();
+const {
+  isPending: isLocationPending,
+  resetPending: resetLocationPending,
+  setPending: setLocationPending,
+} = usePendingSet();
+const {
+  isPending: isProjectPending,
+  resetPending: resetProjectPending,
+  setPending: setProjectPending,
+} = usePendingSet();
 
 const filteredCards = computed(() => {
   const query = searchQuery.value.trim().toLowerCase();
@@ -81,34 +98,6 @@ function onCardKeydown(event: KeyboardEvent, cardKey: string): void {
 
   event.preventDefault();
   toggleCard(cardKey);
-}
-
-function asRecord(value: unknown): Record<string, unknown> | null {
-  if (typeof value !== 'object' || value === null) {
-    return null;
-  }
-  return value as Record<string, unknown>;
-}
-
-function asString(value: unknown, fallback = ''): string {
-  return typeof value === 'string' ? value : fallback;
-}
-
-function asBoolean(value: unknown, fallback = false): boolean {
-  return typeof value === 'boolean' ? value : fallback;
-}
-
-function asStringArray(value: unknown): string[] {
-  if (!Array.isArray(value)) {
-    return [];
-  }
-  return value.filter((entry): entry is string => typeof entry === 'string');
-}
-
-function getLastPathSegment(input: string): string {
-  const normalized = input.replace(/\\/g, '/').replace(/\/+$/, '');
-  const segments = normalized.split('/').filter(Boolean);
-  return segments.at(-1) ?? input;
 }
 
 function formatProjectLabel(record: Record<string, unknown>): {
@@ -216,48 +205,6 @@ function isFlipped(cardKey: string): boolean {
   return flippedCards.value.has(cardKey);
 }
 
-function isCardPending(cardKey: string): boolean {
-  return pendingCardKeys.value.has(cardKey);
-}
-
-function setCardPending(cardKey: string, nextValue: boolean): void {
-  const next = new Set(pendingCardKeys.value);
-  if (nextValue) {
-    next.add(cardKey);
-  } else {
-    next.delete(cardKey);
-  }
-  pendingCardKeys.value = next;
-}
-
-function isLocationPending(cardKey: string): boolean {
-  return pendingLocationKeys.value.has(cardKey);
-}
-
-function setLocationPending(cardKey: string, nextValue: boolean): void {
-  const next = new Set(pendingLocationKeys.value);
-  if (nextValue) {
-    next.add(cardKey);
-  } else {
-    next.delete(cardKey);
-  }
-  pendingLocationKeys.value = next;
-}
-
-function isProjectPending(projectKey: string): boolean {
-  return pendingProjectKeys.value.has(projectKey);
-}
-
-function setProjectPending(projectKey: string, nextValue: boolean): void {
-  const next = new Set(pendingProjectKeys.value);
-  if (nextValue) {
-    next.add(projectKey);
-  } else {
-    next.delete(projectKey);
-  }
-  pendingProjectKeys.value = next;
-}
-
 function toggleCard(cardKey: string): void {
   const next = new Set(flippedCards.value);
   if (next.has(cardKey)) {
@@ -272,9 +219,9 @@ function replaceCards(nextCards: SkillCardView[]): void {
   cards.value = nextCards;
   const activeKeys = new Set(nextCards.map((card) => card.key));
   flippedCards.value = new Set([...flippedCards.value].filter((cardKey) => activeKeys.has(cardKey)));
-  pendingCardKeys.value = new Set([...pendingCardKeys.value].filter((cardKey) => activeKeys.has(cardKey)));
-  pendingLocationKeys.value = new Set([...pendingLocationKeys.value].filter((cardKey) => activeKeys.has(cardKey)));
-  pendingProjectKeys.value = new Set([...pendingProjectKeys.value].filter((projectKey) => activeKeys.has(projectKey.split('::')[0] ?? '')));
+  resetCardPending();
+  resetLocationPending();
+  resetProjectPending();
 }
 
 function updateCardEnabled(cardKey: string, enabled: boolean): void {
@@ -292,11 +239,7 @@ async function loadSkills(): Promise<void> {
     const items = Array.isArray(payload.items) ? payload.items : Array.isArray(payload.skills) ? payload.skills : [];
     replaceCards(items.map((item, index) => normalizeSkillCard(item, index)));
   } catch (error) {
-    if (error instanceof ApiRequestError) {
-      loadError.value = error.detail.message;
-    } else {
-      loadError.value = t('skills.loadFailed');
-    }
+    loadError.value = resolveRequestErrorMessage(error, t('skills.loadFailed'));
   } finally {
     loading.value = false;
   }
@@ -332,11 +275,10 @@ async function toggleSkill(card: SkillCardView): Promise<void> {
     replaceCards(items.map((item, index) => normalizeSkillCard(item, index)));
   } catch (error) {
     updateCardEnabled(card.key, card.globalEnabled);
-    if (error instanceof ApiRequestError) {
-      actionError.value = error.detail.message;
-    } else {
-      actionError.value = nextEnabled ? t('skills.enableFailed', { name: card.name }) : t('skills.disableFailed', { name: card.name });
-    }
+    actionError.value = resolveRequestErrorMessage(
+      error,
+      nextEnabled ? t('skills.enableFailed', { name: card.name }) : t('skills.disableFailed', { name: card.name }),
+    );
   } finally {
     setCardPending(card.key, false);
   }
@@ -356,11 +298,7 @@ async function openSkillLocation(card: SkillCardView): Promise<void> {
       body: JSON.stringify({}),
     });
   } catch (error) {
-    if (error instanceof ApiRequestError) {
-      actionError.value = error.detail.message;
-    } else {
-      actionError.value = t('projectDetail.openFailed');
-    }
+    actionError.value = resolveRequestErrorMessage(error, t('projectDetail.openFailed'));
   } finally {
     setLocationPending(card.key, false);
   }
@@ -386,11 +324,7 @@ async function openProjectLocation(card: SkillCardView, project: ProjectIntersec
       body: JSON.stringify({}),
     });
   } catch (error) {
-    if (error instanceof ApiRequestError) {
-      actionError.value = error.detail.message;
-    } else {
-      actionError.value = t('projectDetail.openFailed');
-    }
+    actionError.value = resolveRequestErrorMessage(error, t('projectDetail.openFailed'));
   } finally {
     setProjectPending(pendingKey, false);
   }
@@ -403,33 +337,19 @@ onMounted(() => {
 
 <template>
   <section class="space-y-4">
-    <header class="page-search-bar">
-      <label class="page-search-bar__label" for="skill-search">{{ t('common.search') }}</label>
-      <div class="page-search-bar__input">
-        <input
-          id="skill-search"
-          v-model="searchQuery"
-          type="search"
-          class="text-input"
-          :placeholder="t('skills.searchPlaceholder')"
-        />
-      </div>
-    </header>
+    <PageSearchBar
+      id="skill-search"
+      v-model="searchQuery"
+      :label="t('common.search')"
+      :placeholder="t('skills.searchPlaceholder')"
+    />
 
-    <section v-if="loading" class="muted-panel">{{ t('skills.loading') }}</section>
-    <section v-else-if="loadError" class="error-panel">
-      {{ loadError }}
-    </section>
-    <section v-else-if="cards.length === 0" class="muted-panel">
-      {{ t('skills.empty') }}
-    </section>
-    <section v-else-if="filteredCards.length === 0" class="muted-panel">
-      {{ t('skills.noMatch') }}
-    </section>
+    <PageStatePanel v-if="loading">{{ t('skills.loading') }}</PageStatePanel>
+    <PageStatePanel v-else-if="loadError" tone="error">{{ loadError }}</PageStatePanel>
+    <PageStatePanel v-else-if="cards.length === 0">{{ t('skills.empty') }}</PageStatePanel>
+    <PageStatePanel v-else-if="filteredCards.length === 0">{{ t('skills.noMatch') }}</PageStatePanel>
 
-    <section v-if="actionError" class="error-panel">
-      {{ actionError }}
-    </section>
+    <PageStatePanel v-if="actionError" tone="error">{{ actionError }}</PageStatePanel>
 
     <ul v-if="!loading && !loadError && cards.length > 0 && filteredCards.length > 0" class="skills-grid">
       <li v-for="card in filteredCards" :key="card.key" class="skill-card-shell">

@@ -1,9 +1,12 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
 
+import PageStatePanel from '../components/PageStatePanel.vue';
 import { ApiRequestError, apiRequest } from '../lib/api';
 import { useSetQuickActions, useWorkspaceSpine } from '../lib/chrome';
+import { asRecord, asString, asStringArray } from '../lib/coerce';
 import { useUiI18n } from '../lib/i18n';
+import { resolveRequestErrorMessage } from '../lib/page';
 
 interface ConfigStoragePaths {
   configFile: string;
@@ -32,24 +35,6 @@ const draftSkillsDir = ref('');
 const draftTargets = ref<string[]>([]);
 const baseline = ref<ConfigBaseline | null>(null);
 const fieldErrors = ref<Record<string, string>>({});
-
-function asRecord(value: unknown): Record<string, unknown> | null {
-  if (typeof value !== 'object' || value === null) {
-    return null;
-  }
-  return value as Record<string, unknown>;
-}
-
-function asString(value: unknown): string {
-  return typeof value === 'string' ? value : '';
-}
-
-function asStringArray(value: unknown): string[] {
-  if (!Array.isArray(value)) {
-    return [];
-  }
-  return value.filter((entry): entry is string => typeof entry === 'string');
-}
 
 function uniqueStrings(values: string[]): string[] {
   return [...new Set(values)];
@@ -134,11 +119,7 @@ async function loadConfig(): Promise<void> {
     baseline.value = nextBaseline;
     setDraftFromBaseline(nextBaseline);
   } catch (error) {
-    if (error instanceof ApiRequestError) {
-      pageError.value = error.detail.message;
-    } else {
-      pageError.value = t('config.loadFailed');
-    }
+    pageError.value = resolveRequestErrorMessage(error, t('config.loadFailed'));
   } finally {
     isLoading.value = false;
   }
@@ -188,12 +169,8 @@ async function saveConfig(): Promise<void> {
     setDraftFromBaseline(nextBaseline);
     successMessage.value = t('config.updated');
   } catch (error) {
-    if (error instanceof ApiRequestError) {
-      pageError.value = error.detail.message;
-      fieldErrors.value = error.detail.fieldErrors ?? {};
-    } else {
-      pageError.value = t('config.updateFailed');
-    }
+    pageError.value = resolveRequestErrorMessage(error, t('config.updateFailed'));
+    fieldErrors.value = error instanceof ApiRequestError ? (error.detail.fieldErrors ?? {}) : {};
   } finally {
     isSaving.value = false;
   }
@@ -248,11 +225,7 @@ async function chooseFolder(): Promise<void> {
 
     pageError.value = t('config.folderPickerHostUnavailable');
   } catch (error) {
-    if (error instanceof ApiRequestError) {
-      pageError.value = error.detail.message;
-    } else {
-      pageError.value = t('config.folderPickerHostUnavailable');
-    }
+    pageError.value = resolveRequestErrorMessage(error, t('config.folderPickerHostUnavailable'));
   } finally {
     isPickingFolder.value = false;
   }
@@ -265,7 +238,7 @@ onMounted(() => {
 
 <template>
   <section class="space-y-4">
-    <section v-if="isLoading" class="muted-panel">{{ t('config.loading') }}</section>
+    <PageStatePanel v-if="isLoading">{{ t('config.loading') }}</PageStatePanel>
 
     <template v-else>
       <section class="panel">
@@ -358,9 +331,7 @@ onMounted(() => {
           </button>
           <p v-if="successMessage" class="text-sm text-muted">{{ successMessage }}</p>
         </div>
-        <p v-if="pageError" class="error-panel mt-3">
-          {{ pageError }}
-        </p>
+        <PageStatePanel v-if="pageError" tone="error" class="mt-3">{{ pageError }}</PageStatePanel>
       </section>
 
       <section class="panel">

@@ -1,10 +1,15 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
-import { useRouter } from 'vue-router';
 
-import { ApiRequestError, apiRequest } from '../lib/api';
+import PageSearchBar from '../components/PageSearchBar.vue';
+import PageStatePanel from '../components/PageStatePanel.vue';
+import { apiRequest } from '../lib/api';
 import { useSetQuickActions, useWorkspaceSpine } from '../lib/chrome';
+import { asNumber, asRecord, asString, asStringArray } from '../lib/coerce';
+import { getProjectLabel } from '../lib/format';
 import { useUiI18n } from '../lib/i18n';
+import { useLocalizedNavigation } from '../lib/navigation';
+import { resolveRequestErrorMessage, usePendingSet } from '../lib/page';
 import type { QuickOpenView } from '../types';
 
 interface ProjectRowView {
@@ -16,16 +21,16 @@ interface ProjectRowView {
   updatedAt: string;
 }
 
-const router = useRouter();
 const setQuickActions = useSetQuickActions();
-const { t, formatDateTime, withLocalePath } = useUiI18n();
+const { t, formatDateTime } = useUiI18n();
+const { pushPath } = useLocalizedNavigation();
 
 const loading = ref(true);
 const errorMessage = ref('');
 const hintMessage = ref('');
 const searchQuery = ref('');
 const rows = ref<ProjectRowView[]>([]);
-const openingProjectIds = ref<Set<string>>(new Set());
+const { isPending: isOpening, resetPending: resetOpening, setPending: setOpening } = usePendingSet();
 
 const filteredRows = computed(() => {
   const query = searchQuery.value.trim().toLowerCase();
@@ -43,30 +48,6 @@ useWorkspaceSpine(() => ({
   scopeLabel: t('projects.title'),
   scopeDescription: errorMessage.value || t('projects.description'),
 }));
-
-function asRecord(value: unknown): Record<string, unknown> | null {
-  if (typeof value !== 'object' || value === null) {
-    return null;
-  }
-
-  return value as Record<string, unknown>;
-}
-
-function asString(value: unknown, fallback = ''): string {
-  return typeof value === 'string' ? value : fallback;
-}
-
-function asStringArray(value: unknown): string[] {
-  if (!Array.isArray(value)) {
-    return [];
-  }
-
-  return value.filter((item): item is string => typeof item === 'string');
-}
-
-function asNumber(value: unknown): number {
-  return typeof value === 'number' && Number.isFinite(value) ? value : 0;
-}
 
 function normalizeProjectRows(payload: unknown): ProjectRowView[] {
   const input = Array.isArray(payload)
@@ -92,41 +73,21 @@ function normalizeProjectRows(payload: unknown): ProjectRowView[] {
 }
 
 function getProjectName(projectPath: string): string {
-  const segments = projectPath.replace(/\\/g, '/').split('/').filter(Boolean);
-  return segments.at(-1) ?? projectPath;
-}
-
-function isOpening(projectId: string): boolean {
-  return openingProjectIds.value.has(projectId);
-}
-
-function pushOpening(projectId: string): void {
-  const next = new Set(openingProjectIds.value);
-  next.add(projectId);
-  openingProjectIds.value = next;
-}
-
-function popOpening(projectId: string): void {
-  const next = new Set(openingProjectIds.value);
-  next.delete(projectId);
-  openingProjectIds.value = next;
+  return getProjectLabel(projectPath);
 }
 
 async function loadProjects(): Promise<void> {
   loading.value = true;
   errorMessage.value = '';
   hintMessage.value = '';
+  resetOpening();
   setQuickActions([]);
 
   try {
     const payload = await apiRequest<unknown>('/api/projects');
     rows.value = normalizeProjectRows(payload);
   } catch (error) {
-    if (error instanceof ApiRequestError) {
-      errorMessage.value = error.detail.message;
-    } else {
-      errorMessage.value = t('projects.loadFailed');
-    }
+    errorMessage.value = resolveRequestErrorMessage(error, t('projects.loadFailed'));
   } finally {
     loading.value = false;
   }
@@ -137,7 +98,7 @@ async function quickOpenProject(projectId: string): Promise<void> {
     return;
   }
 
-  pushOpening(projectId);
+  setOpening(projectId, true);
   hintMessage.value = '';
 
   try {
@@ -147,18 +108,14 @@ async function quickOpenProject(projectId: string): Promise<void> {
     });
     hintMessage.value = payload.message;
   } catch (error) {
-    if (error instanceof ApiRequestError) {
-      hintMessage.value = error.detail.message;
-    } else {
-      hintMessage.value = t('projects.openFailed');
-    }
+    hintMessage.value = resolveRequestErrorMessage(error, t('projects.openFailed'));
   } finally {
-    popOpening(projectId);
+    setOpening(projectId, false);
   }
 }
 
 function openProjectDetail(projectId: string): void {
-  void router.push(withLocalePath(`/projects/${encodeURIComponent(projectId)}`));
+  void pushPath(`/projects/${encodeURIComponent(projectId)}`);
 }
 
 onMounted(() => {
@@ -168,29 +125,17 @@ onMounted(() => {
 
 <template>
   <section class="space-y-4">
-    <header class="page-search-bar">
-      <label class="page-search-bar__label" for="project-search">{{ t('common.search') }}</label>
-      <div class="page-search-bar__input">
-        <input
-          id="project-search"
-          v-model="searchQuery"
-          class="text-input"
-          type="search"
-          :placeholder="t('projects.searchPlaceholder')"
-        />
-      </div>
-    </header>
+    <PageSearchBar
+      id="project-search"
+      v-model="searchQuery"
+      :label="t('common.search')"
+      :placeholder="t('projects.searchPlaceholder')"
+    />
 
-    <section v-if="loading" class="muted-panel">{{ t('projects.loading') }}</section>
-    <section v-else-if="errorMessage" class="error-panel">
-      {{ errorMessage }}
-    </section>
-    <section v-else-if="rows.length === 0" class="muted-panel">
-      {{ t('projects.empty') }}
-    </section>
-    <section v-else-if="filteredRows.length === 0" class="muted-panel">
-      {{ t('projects.noMatch') }}
-    </section>
+    <PageStatePanel v-if="loading">{{ t('projects.loading') }}</PageStatePanel>
+    <PageStatePanel v-else-if="errorMessage" tone="error">{{ errorMessage }}</PageStatePanel>
+    <PageStatePanel v-else-if="rows.length === 0">{{ t('projects.empty') }}</PageStatePanel>
+    <PageStatePanel v-else-if="filteredRows.length === 0">{{ t('projects.noMatch') }}</PageStatePanel>
     <ul v-else class="overflow-hidden rounded-shell bg-canvas p-0 shadow-card divide-y divide-charcoal/10">
       <li v-for="row in filteredRows" :key="row.projectId" class="index-row">
         <button type="button" class="index-row-main" @click="openProjectDetail(row.projectId)">
@@ -225,9 +170,7 @@ onMounted(() => {
       </li>
     </ul>
 
-    <p v-if="hintMessage" class="notice-panel">
-      {{ hintMessage }}
-    </p>
+    <PageStatePanel v-if="hintMessage" tone="notice" tag="p">{{ hintMessage }}</PageStatePanel>
   </section>
 </template>
 

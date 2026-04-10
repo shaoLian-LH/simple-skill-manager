@@ -1,10 +1,14 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch, watchEffect } from 'vue';
-import { useRoute, useRouter } from 'vue-router';
+import { useRoute } from 'vue-router';
 
-import { ApiRequestError, apiRequest } from '../lib/api';
+import PageSearchBar from '../components/PageSearchBar.vue';
+import PageStatePanel from '../components/PageStatePanel.vue';
+import { apiRequest } from '../lib/api';
 import { useSetQuickActions, useSetWorkspaceContext } from '../lib/chrome';
 import { useUiI18n } from '../lib/i18n';
+import { useLocalizedNavigation } from '../lib/navigation';
+import { resolveRequestErrorMessage } from '../lib/page';
 import { sourceStateLabel } from '../../../../text.js';
 import type {
   PresetDeletePreviewView,
@@ -14,10 +18,10 @@ import type {
 } from '../types';
 
 const route = useRoute();
-const router = useRouter();
 const setQuickActions = useSetQuickActions();
 const setWorkspaceContext = useSetWorkspaceContext();
-const { locale, t, withLocalePath } = useUiI18n();
+const { locale, t } = useUiI18n();
+const { pushPath, replacePath } = useLocalizedNavigation();
 
 const loading = ref(true);
 const actionBusy = ref(false);
@@ -88,11 +92,7 @@ async function loadPresetDetail(): Promise<void> {
     deletePreview.value = previewPayload;
     buildWorkspaceContext(detailPayload);
   } catch (error) {
-    if (error instanceof ApiRequestError) {
-      errorMessage.value = error.detail.message;
-    } else {
-      errorMessage.value = t('presetDetail.loadFailed');
-    }
+    errorMessage.value = resolveRequestErrorMessage(error, t('presetDetail.loadFailed'));
     setWorkspaceContext({
       scopeLabel: t('presetDetail.scopeLabel'),
       scopeDescription: t('presetDetail.scopeErrorDescription'),
@@ -128,11 +128,7 @@ async function toggleSkill(skill: PresetSkillMembershipView): Promise<void> {
 
     await loadPresetDetail();
   } catch (error) {
-    if (error instanceof ApiRequestError) {
-      actionMessage.value = error.detail.message;
-    } else {
-      actionMessage.value = t('presetDetail.updateFailed', { name: skill.name });
-    }
+    actionMessage.value = resolveRequestErrorMessage(error, t('presetDetail.updateFailed', { name: skill.name }));
   } finally {
     actionBusy.value = false;
   }
@@ -182,20 +178,16 @@ async function deletePreset(): Promise<void> {
       method: 'DELETE',
     });
     actionMessage.value = t('presetDetail.deleted', { name: result.deleted.name });
-    await router.replace(withLocalePath('/presets'));
+    await replacePath('/presets');
   } catch (error) {
-    if (error instanceof ApiRequestError) {
-      actionMessage.value = error.detail.message;
-    } else {
-      actionMessage.value = t('presetDetail.deleteFailed');
-    }
+    actionMessage.value = resolveRequestErrorMessage(error, t('presetDetail.deleteFailed'));
   } finally {
     deleting.value = false;
   }
 }
 
 function openProjectDetail(projectId: string): void {
-  void router.push(withLocalePath(`/projects/${encodeURIComponent(projectId)}`));
+  void pushPath(`/projects/${encodeURIComponent(projectId)}`);
 }
 
 watchEffect(() => {
@@ -228,10 +220,8 @@ onMounted(() => {
 
 <template>
   <section class="space-y-4">
-    <section v-if="loading" class="muted-panel">{{ t('presetDetail.loading') }}</section>
-    <section v-else-if="errorMessage" class="error-panel">
-      {{ errorMessage }}
-    </section>
+    <PageStatePanel v-if="loading">{{ t('presetDetail.loading') }}</PageStatePanel>
+    <PageStatePanel v-else-if="errorMessage" tone="error">{{ errorMessage }}</PageStatePanel>
     <template v-else-if="detail">
       <div class="flex justify-end">
         <button
@@ -244,9 +234,7 @@ onMounted(() => {
         </button>
       </div>
 
-      <p v-if="actionMessage" class="notice-panel">
-        {{ actionMessage }}
-      </p>
+      <PageStatePanel v-if="actionMessage" tone="notice" tag="p">{{ actionMessage }}</PageStatePanel>
 
       <div class="grid gap-4 xl:grid-cols-[minmax(0,1.45fr)_minmax(0,1fr)]">
         <section class="panel">
@@ -256,12 +244,10 @@ onMounted(() => {
               <p class="mt-2 text-sm leading-6 text-muted">{{ t('presetDetail.membershipDescription') }}</p>
             </div>
             <div class="w-full md:w-[280px]">
-              <label class="field-label" for="preset-skill-search">{{ t('common.search') }}</label>
-              <input
+              <PageSearchBar
                 id="preset-skill-search"
                 v-model="searchQuery"
-                class="text-input"
-                type="search"
+                :label="t('common.search')"
                 :placeholder="t('presetDetail.searchPlaceholder')"
               />
             </div>

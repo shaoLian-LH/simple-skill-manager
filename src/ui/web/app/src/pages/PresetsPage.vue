@@ -1,16 +1,19 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
-import { useRouter } from 'vue-router';
 
-import { ApiRequestError, apiRequest } from '../lib/api';
+import PageSearchBar from '../components/PageSearchBar.vue';
+import PageStatePanel from '../components/PageStatePanel.vue';
+import { apiRequest } from '../lib/api';
 import { useSetQuickActions, useWorkspaceSpine } from '../lib/chrome';
 import { useUiI18n } from '../lib/i18n';
+import { useLocalizedNavigation } from '../lib/navigation';
+import { resolveRequestErrorMessage } from '../lib/page';
 import { sourceStateLabel } from '../../../../text.js';
 import type { PresetsView, PresetView } from '../types';
 
-const router = useRouter();
 const setQuickActions = useSetQuickActions();
-const { locale, t, withLocalePath } = useUiI18n();
+const { locale, t } = useUiI18n();
+const { pushPath } = useLocalizedNavigation();
 
 const loading = ref(true);
 const errorMessage = ref('');
@@ -54,18 +57,14 @@ async function loadPresets(): Promise<void> {
     const payload = await apiRequest<PresetsView>('/api/presets');
     presets.value = [...payload.items].sort((left, right) => left.name.localeCompare(right.name));
   } catch (error) {
-    if (error instanceof ApiRequestError) {
-      errorMessage.value = error.detail.message;
-    } else {
-      errorMessage.value = t('presets.loadFailed');
-    }
+    errorMessage.value = resolveRequestErrorMessage(error, t('presets.loadFailed'));
   } finally {
     loading.value = false;
   }
 }
 
 function openPresetDetail(name: string): void {
-  void router.push(withLocalePath(`/presets/${encodeURIComponent(name)}`));
+  void pushPath(`/presets/${encodeURIComponent(name)}`);
 }
 
 onMounted(() => {
@@ -75,29 +74,17 @@ onMounted(() => {
 
 <template>
   <section class="space-y-4">
-    <header class="page-search-bar">
-      <label class="page-search-bar__label" for="preset-search">{{ t('common.search') }}</label>
-      <div class="page-search-bar__input">
-        <input
-          id="preset-search"
-          v-model="searchQuery"
-          class="text-input"
-          type="search"
-          :placeholder="t('presets.searchPlaceholder')"
-        />
-      </div>
-    </header>
+    <PageSearchBar
+      id="preset-search"
+      v-model="searchQuery"
+      :label="t('common.search')"
+      :placeholder="t('presets.searchPlaceholder')"
+    />
 
-    <section v-if="loading" class="muted-panel">{{ t('presets.loading') }}</section>
-    <section v-else-if="errorMessage" class="error-panel">
-      {{ errorMessage }}
-    </section>
-    <section v-else-if="presets.length === 0" class="muted-panel">
-      {{ t('presets.empty') }}
-    </section>
-    <section v-else-if="filteredPresets.length === 0" class="muted-panel">
-      {{ t('presets.noMatch') }}
-    </section>
+    <PageStatePanel v-if="loading">{{ t('presets.loading') }}</PageStatePanel>
+    <PageStatePanel v-else-if="errorMessage" tone="error">{{ errorMessage }}</PageStatePanel>
+    <PageStatePanel v-else-if="presets.length === 0">{{ t('presets.empty') }}</PageStatePanel>
+    <PageStatePanel v-else-if="filteredPresets.length === 0">{{ t('presets.noMatch') }}</PageStatePanel>
     <ul v-else class="space-y-2">
       <li v-for="preset in filteredPresets" :key="preset.name">
         <button type="button" class="preset-index-row" @click="openPresetDetail(preset.name)">

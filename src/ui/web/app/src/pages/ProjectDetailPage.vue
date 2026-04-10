@@ -2,9 +2,12 @@
 import { computed, onMounted, ref, watch, watchEffect } from 'vue';
 import { useRoute } from 'vue-router';
 
-import { ApiRequestError, apiRequest } from '../lib/api';
+import PageSearchBar from '../components/PageSearchBar.vue';
+import PageStatePanel from '../components/PageStatePanel.vue';
+import { apiRequest } from '../lib/api';
 import { useSetQuickActions, useSetWorkspaceContext } from '../lib/chrome';
 import { useUiI18n } from '../lib/i18n';
+import { resolveRequestErrorMessage, usePendingSet } from '../lib/page';
 import { sourceStateLabel } from '../../../../text.js';
 import type {
   ProjectDetailView,
@@ -22,9 +25,9 @@ const loading = ref(true);
 const errorMessage = ref('');
 const actionMessage = ref('');
 const detail = ref<ProjectDetailView | null>(null);
-const busyPresetNames = ref<Set<string>>(new Set());
-const busySkillNames = ref<Set<string>>(new Set());
 const skillSearch = ref('');
+const { isPending: isPresetBusy, setPending: setPresetBusy } = usePendingSet();
+const { isPending: isSkillBusy, setPending: setSkillBusy } = usePendingSet();
 
 const projectId = computed(() => {
   const raw = route.params.projectId;
@@ -60,34 +63,6 @@ function matchesSkillSearch(row: ProjectSkillControlView): boolean {
 
 function filterSkillRows(rows: ProjectSkillControlView[]): ProjectSkillControlView[] {
   return rows.filter((row) => matchesSkillSearch(row));
-}
-
-function setPresetBusy(name: string, nextValue: boolean): void {
-  const next = new Set(busyPresetNames.value);
-  if (nextValue) {
-    next.add(name);
-  } else {
-    next.delete(name);
-  }
-  busyPresetNames.value = next;
-}
-
-function setSkillBusy(name: string, nextValue: boolean): void {
-  const next = new Set(busySkillNames.value);
-  if (nextValue) {
-    next.add(name);
-  } else {
-    next.delete(name);
-  }
-  busySkillNames.value = next;
-}
-
-function isPresetBusy(name: string): boolean {
-  return busyPresetNames.value.has(name);
-}
-
-function isSkillBusy(name: string): boolean {
-  return busySkillNames.value.has(name);
 }
 
 function buildWorkspaceContext(current: ProjectDetailView): void {
@@ -157,11 +132,7 @@ async function loadProjectDetail(): Promise<void> {
     detail.value = payload;
     buildWorkspaceContext(payload);
   } catch (error) {
-    if (error instanceof ApiRequestError) {
-      errorMessage.value = error.detail.message;
-    } else {
-      errorMessage.value = t('projectDetail.loadFailed');
-    }
+    errorMessage.value = resolveRequestErrorMessage(error, t('projectDetail.loadFailed'));
     setWorkspaceContext(null);
   } finally {
     loading.value = false;
@@ -192,11 +163,7 @@ async function togglePreset(row: ProjectPresetControlView): Promise<void> {
     detail.value = response;
     buildWorkspaceContext(response);
   } catch (error) {
-    if (error instanceof ApiRequestError) {
-      actionMessage.value = error.detail.message;
-    } else {
-      actionMessage.value = t('projectDetail.updatePresetFailed', { name: row.name });
-    }
+    actionMessage.value = resolveRequestErrorMessage(error, t('projectDetail.updatePresetFailed', { name: row.name }));
   } finally {
     setPresetBusy(row.name, false);
   }
@@ -226,11 +193,7 @@ async function toggleSkill(row: ProjectSkillControlView): Promise<void> {
     detail.value = response;
     buildWorkspaceContext(response);
   } catch (error) {
-    if (error instanceof ApiRequestError) {
-      actionMessage.value = error.detail.message;
-    } else {
-      actionMessage.value = t('projectDetail.updateSkillFailed', { name: row.name });
-    }
+    actionMessage.value = resolveRequestErrorMessage(error, t('projectDetail.updateSkillFailed', { name: row.name }));
   } finally {
     setSkillBusy(row.name, false);
   }
@@ -273,14 +236,10 @@ onMounted(() => {
 
 <template>
   <section class="space-y-4">
-    <section v-if="loading" class="muted-panel">{{ t('projectDetail.loading') }}</section>
-    <section v-else-if="errorMessage" class="error-panel">
-      {{ errorMessage }}
-    </section>
+    <PageStatePanel v-if="loading">{{ t('projectDetail.loading') }}</PageStatePanel>
+    <PageStatePanel v-else-if="errorMessage" tone="error">{{ errorMessage }}</PageStatePanel>
     <template v-else-if="detail">
-      <p v-if="actionMessage" class="notice-panel">
-        {{ actionMessage }}
-      </p>
+      <PageStatePanel v-if="actionMessage" tone="notice" tag="p">{{ actionMessage }}</PageStatePanel>
 
       <div class="project-detail-layout">
         <section class="panel">
@@ -290,12 +249,10 @@ onMounted(() => {
               <p class="mt-2 text-sm leading-6 text-muted">{{ t('projectDetail.skillsDescription') }}</p>
             </div>
             <div class="w-full md:w-[280px]">
-              <label class="field-label" for="project-skill-search">{{ t('common.search') }}</label>
-              <input
+              <PageSearchBar
                 id="project-skill-search"
                 v-model="skillSearch"
-                class="text-input"
-                type="search"
+                :label="t('common.search')"
                 :placeholder="t('projectDetail.searchPlaceholder')"
               />
             </div>
