@@ -45,7 +45,7 @@ const filteredRows = computed(() => {
 });
 
 useWorkspaceSpine(() => ({
-  scopeLabel: t('projects.title'),
+  scopeLabel: t('nav.projects'),
   scopeDescription: errorMessage.value || t('projects.description'),
 }));
 

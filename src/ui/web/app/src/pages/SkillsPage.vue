@@ -452,7 +452,7 @@ onMounted(() => {
               </section>
 
               <section class="rounded-card bg-subtle p-4 shadow-card">
-                <p class="field-label">{{ t('skills.viaPreset') }}</p>
+                <p class="field-label">{{ t('common.viaPreset') }}</p>
                 <ul v-if="card.viaPresetProjects.length > 0" class="mt-2 space-y-2">
                   <li
                     v-for="project in card.viaPresetProjects"

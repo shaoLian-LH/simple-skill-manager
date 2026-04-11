@@ -64,24 +64,14 @@ const MESSAGES: Record<UiLocale, UiTextValue> = {
     route: {
       workbench: '总览',
       openingWorkbench: '正在打开界面',
-      overview: '总览',
-      projects: '项目',
       projectDetail: '项目详情',
-      skills: '技能',
-      presets: '技能集',
       presetDetail: '技能集详情',
-      config: '配置',
       notFound: '页面不存在',
     },
     router: {
       missing: {
         notReady: '{{label}} 页面尚未就绪。',
         autoAppear: '补齐页面实现后，这个模块会自动显示。',
-      },
-      notFound: {
-        label: '路由不存在',
-        title: '这个路径没有映射到任何页面。',
-        description: '请使用左侧索引返回到总览、项目、技能、技能集或配置。',
       },
     },
     app: {
@@ -148,7 +138,6 @@ const MESSAGES: Record<UiLocale, UiTextValue> = {
     },
     projects: {
       workspaceLabel: '项目索引',
-      title: '项目',
       description: '定位项目、查看其启用摘要，并直接进入详情页。',
       searchPlaceholder: '按项目名、路径、目标或 ID 过滤',
       loading: '正在加载项目...',
@@ -176,7 +165,6 @@ const MESSAGES: Record<UiLocale, UiTextValue> = {
       usage: '使用情况',
       intersection: '作用于',
       directProjects: '直接启用项目',
-      viaPreset: '来自技能集',
       noDirectProjects: '当前没有项目直接启用这个技能。',
       noViaPresetProjects: '当前没有项目通过技能集获得这个技能。',
       noDescription: '暂无描述。',
@@ -184,11 +172,9 @@ const MESSAGES: Record<UiLocale, UiTextValue> = {
       viaPresetNote: '通过 {{names}}',
     },
     presets: {
-      scopeLabel: '全局',
       scopeDescription: '技能集目录，包含来源状态与下游引用。',
       scopeErrorDescription: '技能集目录因加载错误暂不可用。',
       workspaceLabel: '技能集目录',
-      title: '技能集',
       description: '浏览可复用的技能集组合，并打开详情页查看成员与影响。',
       searchPlaceholder: '按名称、来源或数量过滤',
       loading: '正在加载技能集...',
@@ -221,8 +207,6 @@ const MESSAGES: Record<UiLocale, UiTextValue> = {
       deleteConfirmWithRefs: '技能集 {{name}} 当前影响 {{count}} 个项目。\n\n{{projects}}\n\n确认移除技能集 {{name}} 吗？',
       projectCount: '{{count}} 个项目',
       skillCount: '{{count}} 个技能',
-      toggleAdd: '添加',
-      toggleRemove: '移除',
     },
     projectDetail: {
       loading: '正在加载项目详情...',
@@ -243,13 +227,9 @@ const MESSAGES: Record<UiLocale, UiTextValue> = {
       noEnabledSkillMatch: '没有已启用技能匹配当前搜索。',
       noAvailableSkillMatch: '没有可用技能匹配当前搜索。',
       noResolvedSkills: '该项目当前没有生效技能。',
-      notEnabled: '未启用',
       controlledByPreset: '由技能集 {{names}} 控制。',
       updatePresetFailed: '无法更新技能集 {{name}}。',
       updateSkillFailed: '无法更新技能 {{name}}。',
-      enabledSection: '已启用',
-      availableSection: '可用',
-      noTargets: '无',
       sourceReadonlySuffix: ' · 只读',
     },
     config: {
@@ -488,24 +468,14 @@ const MESSAGES: Record<UiLocale, UiTextValue> = {
     route: {
       workbench: 'Overview',
       openingWorkbench: 'Opening Interface',
-      overview: 'Overview',
-      projects: 'Projects',
       projectDetail: 'Project Detail',
-      skills: 'Skills',
-      presets: 'Presets',
       presetDetail: 'Preset Detail',
-      config: 'Config',
       notFound: 'Not Found',
     },
     router: {
       missing: {
         notReady: '{{label}} is not ready yet.',
         autoAppear: 'This module will appear automatically after its page implementation is added.',
-      },
-      notFound: {
-        label: 'Route Not Found',
-        title: 'This path does not map to any page.',
-        description: 'Use Overview, Projects, Skills, Presets, or Config from the left navigation.',
       },
     },
     app: {
@@ -572,7 +542,6 @@ const MESSAGES: Record<UiLocale, UiTextValue> = {
     },
     projects: {
       workspaceLabel: 'Projects Index',
-      title: 'Projects',
       description: 'Locate a project, inspect its enabled summary, and jump straight into the detail page.',
       searchPlaceholder: 'Filter by project name, path, target, or id',
       loading: 'Loading projects...',
@@ -600,7 +569,6 @@ const MESSAGES: Record<UiLocale, UiTextValue> = {
       usage: 'Usage',
       intersection: 'Intersection',
       directProjects: 'Direct Projects',
-      viaPreset: 'Via Preset',
       noDirectProjects: 'No projects currently enable this skill directly.',
       noViaPresetProjects: 'No project receives this skill through presets.',
       noDescription: 'No description available.',
@@ -608,11 +576,9 @@ const MESSAGES: Record<UiLocale, UiTextValue> = {
       viaPresetNote: 'via {{names}}',
     },
     presets: {
-      scopeLabel: 'Global',
       scopeDescription: 'Preset directory with scoped source state and downstream references.',
       scopeErrorDescription: 'Preset directory is unavailable due to loading error.',
       workspaceLabel: 'Preset Directory',
-      title: 'Presets',
       description: 'Browse reusable preset bundles, then open the detail page for membership and impact.',
       searchPlaceholder: 'Filter by name, source, or count',
       loading: 'Loading presets...',
@@ -645,8 +611,6 @@ const MESSAGES: Record<UiLocale, UiTextValue> = {
       deleteConfirmWithRefs: 'Preset {{name}} currently affects {{count}} project(s).\n\n{{projects}}\n\nRemove preset {{name}}?',
       projectCount: '{{count}} projects',
       skillCount: '{{count}} skills',
-      toggleAdd: 'Add',
-      toggleRemove: 'Remove',
     },
     projectDetail: {
       loading: 'Loading project detail...',
@@ -667,13 +631,9 @@ const MESSAGES: Record<UiLocale, UiTextValue> = {
       noEnabledSkillMatch: 'No enabled skill matches this query.',
       noAvailableSkillMatch: 'No available skill matches this query.',
       noResolvedSkills: 'No effective skill is active in this project.',
-      notEnabled: 'Not enabled',
       controlledByPreset: 'Controlled by preset {{names}}.',
       updatePresetFailed: 'Failed to update preset {{name}}.',
       updateSkillFailed: 'Failed to update skill {{name}}.',
-      enabledSection: 'Enabled',
-      availableSection: 'Available',
-      noTargets: 'None',
       sourceReadonlySuffix: ' · readonly',
     },
     config: {

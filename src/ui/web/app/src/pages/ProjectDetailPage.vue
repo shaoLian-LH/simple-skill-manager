@@ -69,7 +69,7 @@ function buildWorkspaceContext(current: ProjectDetailView): void {
   setWorkspaceContext({
     scopeLabel: current.displayName || t('common.scopeProject'),
     scopeDescription: t('projectDetail.targets', {
-      targets: current.targets.length > 0 ? current.targets.join(', ') : t('projectDetail.noTargets'),
+      targets: current.targets.length > 0 ? current.targets.join(', ') : t('common.none'),
       updatedAt: formatDateTime(current.updatedAt),
     }),
     targets: current.targets,
@@ -94,7 +94,7 @@ function skillMeta(row: ProjectSkillControlView): string {
     return t('facade.viaPresetLabel', { name: row.viaPresets.join(', ') });
   }
 
-  return t('projectDetail.notEnabled');
+  return t('common.disabled');
 }
 
 function resolvedLabels(row: ResolvedSkillView): string[] {
@@ -260,7 +260,7 @@ onMounted(() => {
 
           <div class="mt-4 space-y-4">
             <div>
-              <p class="field-label">{{ t('projectDetail.enabledSection') }}</p>
+              <p class="field-label">{{ t('common.enabled') }}</p>
               <ul v-if="filteredEnabledSkillRows.length > 0" class="skill-control-grid mt-3">
                 <li v-for="row in filteredEnabledSkillRows" :key="`enabled-skill-${row.name}`" class="skill-control-card">
                   <div class="min-w-0">
@@ -295,7 +295,7 @@ onMounted(() => {
             </div>
 
             <div>
-              <p class="field-label">{{ t('projectDetail.availableSection') }}</p>
+              <p class="field-label">{{ t('common.available') }}</p>
               <ul v-if="filteredAvailableSkillRows.length > 0" class="skill-control-grid mt-3">
                 <li v-for="row in filteredAvailableSkillRows" :key="`available-skill-${row.name}`" class="skill-control-card">
                   <div class="min-w-0">
@@ -307,7 +307,7 @@ onMounted(() => {
                       {{ row.description || row.path }}
                     </p>
                     <p class="skill-control-card__meta mt-3 text-xs text-muted">
-                      {{ row.reason || t('projectDetail.notEnabled') }}
+                      {{ row.reason || t('common.disabled') }}
                     </p>
                   </div>
                   <button
@@ -331,7 +331,7 @@ onMounted(() => {
 
           <div class="mt-4 space-y-4">
             <div>
-              <p class="field-label">{{ t('projectDetail.enabledSection') }}</p>
+              <p class="field-label">{{ t('common.enabled') }}</p>
               <ul v-if="detail.presetControls.enabled.length > 0" class="mt-2 space-y-2">
                 <li v-for="row in detail.presetControls.enabled" :key="`enabled-preset-${row.name}`" class="preset-control-row">
                   <div class="min-w-0">
@@ -352,7 +352,7 @@ onMounted(() => {
             </div>
 
             <div>
-              <p class="field-label">{{ t('projectDetail.availableSection') }}</p>
+              <p class="field-label">{{ t('common.available') }}</p>
               <ul v-if="detail.presetControls.available.length > 0" class="mt-2 space-y-2">
                 <li v-for="row in detail.presetControls.available" :key="`available-preset-${row.name}`" class="preset-control-row">
                   <div class="min-w-0">

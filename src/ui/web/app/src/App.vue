@@ -38,7 +38,7 @@ const navigationItems = [
 ] as const;
 
 const activeNavKey = computed(() => String(route.meta.navKey ?? ''));
-const routeTitle = computed(() => t(String(route.meta.titleKey ?? 'route.overview')));
+const routeTitle = computed(() => t(String(route.meta.titleKey ?? 'nav.overview')));
 const routeDescription = computed(() => {
   switch (activeNavKey.value) {
     case 'overview':

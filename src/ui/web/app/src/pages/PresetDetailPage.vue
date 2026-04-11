@@ -270,8 +270,8 @@ onMounted(() => {
                     ? actionBusy
                       ? t('common.updating')
                       : skill.included
-                        ? t('presetDetail.toggleRemove')
-                        : t('presetDetail.toggleAdd')
+                        ? t('common.remove')
+                        : t('common.add')
                     : t('common.readonly')
                 }}
               </button>

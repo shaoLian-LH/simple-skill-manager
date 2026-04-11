@@ -37,7 +37,7 @@ const filteredPresets = computed(() => {
 });
 
 useWorkspaceSpine(() => ({
-  scopeLabel: t('presets.title'),
+  scopeLabel: t('nav.presets'),
   scopeDescription: errorMessage.value || t('presets.scopeDescription'),
 }));
 

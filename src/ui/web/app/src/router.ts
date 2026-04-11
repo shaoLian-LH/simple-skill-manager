@@ -9,13 +9,13 @@ const pageModules = import.meta.glob('./pages/*.vue');
 
 type RouteTitleKey =
   | 'route.openingWorkbench'
-  | 'route.overview'
-  | 'route.projects'
+  | 'nav.overview'
+  | 'nav.projects'
   | 'route.projectDetail'
-  | 'route.skills'
-  | 'route.presets'
+  | 'nav.skills'
+  | 'nav.presets'
   | 'route.presetDetail'
-  | 'route.config'
+  | 'nav.config'
   | 'route.notFound';
 
 function createMissingPage(labelKey: RouteTitleKey): Component {
@@ -59,12 +59,12 @@ const NotFoundPage: Component = {
   setup() {
     return () =>
       h('section', { class: 'panel' }, [
-        h('p', { class: 'field-label' }, translateUiText(getCurrentUiLocale(), 'router.notFound.label')),
-        h('h3', { class: 'mt-2 font-display text-2xl text-charcoal' }, translateUiText(getCurrentUiLocale(), 'router.notFound.title')),
+        h('p', { class: 'field-label' }, translateUiText(getCurrentUiLocale(), 'notFound.scopeLabel')),
+        h('h3', { class: 'mt-2 font-display text-2xl text-charcoal' }, translateUiText(getCurrentUiLocale(), 'notFound.title')),
         h(
           'p',
           { class: 'mt-2 text-sm text-muted' },
-          translateUiText(getCurrentUiLocale(), 'router.notFound.description'),
+          translateUiText(getCurrentUiLocale(), 'notFound.copy'),
         ),
       ]);
   },
@@ -77,13 +77,13 @@ export const router = createRouter({
     { path: '/dashboard', redirect: '/overview' },
     {
       path: '/overview',
-      component: loadWorkspacePage('OverviewPage', 'route.overview'),
-      meta: { titleKey: 'route.overview' satisfies RouteTitleKey, navKey: 'overview' },
+      component: loadWorkspacePage('OverviewPage', 'nav.overview'),
+      meta: { titleKey: 'nav.overview' satisfies RouteTitleKey, navKey: 'overview' },
     },
     {
       path: '/projects',
-      component: loadWorkspacePage('ProjectsPage', 'route.projects'),
-      meta: { titleKey: 'route.projects' satisfies RouteTitleKey, navKey: 'projects' },
+      component: loadWorkspacePage('ProjectsPage', 'nav.projects'),
+      meta: { titleKey: 'nav.projects' satisfies RouteTitleKey, navKey: 'projects' },
     },
     {
       path: '/projects/:projectId',
@@ -93,13 +93,13 @@ export const router = createRouter({
     },
     {
       path: '/skills',
-      component: loadWorkspacePage('SkillsPage', 'route.skills'),
-      meta: { titleKey: 'route.skills' satisfies RouteTitleKey, navKey: 'skills' },
+      component: loadWorkspacePage('SkillsPage', 'nav.skills'),
+      meta: { titleKey: 'nav.skills' satisfies RouteTitleKey, navKey: 'skills' },
     },
     {
       path: '/presets',
-      component: loadWorkspacePage('PresetsPage', 'route.presets'),
-      meta: { titleKey: 'route.presets' satisfies RouteTitleKey, navKey: 'presets' },
+      component: loadWorkspacePage('PresetsPage', 'nav.presets'),
+      meta: { titleKey: 'nav.presets' satisfies RouteTitleKey, navKey: 'presets' },
     },
     {
       path: '/presets/:presetName',
@@ -109,8 +109,8 @@ export const router = createRouter({
     },
     {
       path: '/config',
-      component: loadWorkspacePage('ConfigPage', 'route.config'),
-      meta: { titleKey: 'route.config' satisfies RouteTitleKey, navKey: 'config' },
+      component: loadWorkspacePage('ConfigPage', 'nav.config'),
+      meta: { titleKey: 'nav.config' satisfies RouteTitleKey, navKey: 'config' },
     },
     {
       path: '/:pathMatch(.*)*',
