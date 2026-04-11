@@ -26,6 +26,7 @@ import { getSkillByName, listSkills, toSkillInspectView } from '../core/registry
 import { loadGlobalState } from '../core/state/global-state.js';
 import { loadProjectState } from '../core/state/project-state.js';
 import type { ActivationScope, ActivationState, PresetDefinition } from '../core/types.js';
+import { stableUnique } from '../core/utils/collection.js';
 import { toDisplayPath } from '../core/utils/path.js';
 import { runUiCommand, type UiCommandRuntime } from '../ui/server/runtime.js';
 import { PromptCancelledError, type PromptAdapter, type PromptChoice, TtyPromptAdapter } from './interactive/adapter.js';
@@ -41,19 +42,6 @@ function printStderr(payload: string): void {
 
 function collectTargetsOption(value: string, previous: string[]): string[] {
   return [...previous, value];
-}
-
-function stableUnique(values: string[]): string[] {
-  const seen = new Set<string>();
-  const next: string[] = [];
-  for (const value of values.map((entry) => entry.trim()).filter((entry) => entry.length > 0)) {
-    if (seen.has(value)) {
-      continue;
-    }
-    seen.add(value);
-    next.push(value);
-  }
-  return next;
 }
 
 function parsePortOption(value: string): number {

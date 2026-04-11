@@ -3,13 +3,11 @@ import path from 'node:path';
 import {
   PROJECT_STATE_DIR,
   PROJECT_STATE_FILE,
-  STATE_VERSION,
 } from '../constants.js';
 import { SkmError } from '../errors.js';
-import { assertSupportedTargets } from '../install/targets.js';
 import type { ProjectState } from '../types.js';
 import { ensureDir, pathExists, readJsonFile, writeJsonFileAtomic } from '../utils/fs.js';
-import { nowIso } from '../utils/time.js';
+import { createEmptyActivationState, validateActivationState } from './shared.js';
 
 export function getProjectStateDir(projectPath: string): string {
   return path.join(projectPath, PROJECT_STATE_DIR);
@@ -23,14 +21,10 @@ export async function ensureProjectStateDir(projectPath: string): Promise<void> 
   await ensureDir(getProjectStateDir(projectPath));
 }
 
-export function createEmptyProjectState(projectPath: string, now = nowIso()): ProjectState {
+export function createEmptyProjectState(projectPath: string, now?: string): ProjectState {
   return {
-    version: STATE_VERSION,
+    ...createEmptyActivationState(now),
     projectPath,
-    targets: {},
-    enabledSkills: [],
-    enabledPresets: [],
-    updatedAt: now,
   };
 }
 
@@ -60,29 +54,13 @@ export async function saveProjectState(projectPath: string, state: ProjectState)
 }
 
 function validateProjectState(state: ProjectState, sourcePath: string): void {
-  if (state.version !== STATE_VERSION) {
-    throw new SkmError('config', 'Project state version is unsupported.', {
-      details: `${sourcePath}: version=${String(state.version)}`,
-      hint: 'Recreate the state file using the current CLI.',
-    });
-  }
+  validateActivationState(state, sourcePath, {
+    scopeLabel: 'Project',
+    versionHint: 'Recreate the state file using the current CLI.',
+  });
 
   if (!state.projectPath || typeof state.projectPath !== 'string') {
     throw new SkmError('config', 'Project state is missing projectPath.', {
-      details: sourcePath,
-    });
-  }
-
-  if (!state.targets || typeof state.targets !== 'object') {
-    throw new SkmError('config', 'Project state has invalid targets.', {
-      details: sourcePath,
-    });
-  }
-
-  assertSupportedTargets(Object.keys(state.targets));
-
-  if (!Array.isArray(state.enabledSkills) || !Array.isArray(state.enabledPresets)) {
-    throw new SkmError('config', 'Project state has invalid enabled arrays.', {
       details: sourcePath,
     });
   }

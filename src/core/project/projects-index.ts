@@ -67,5 +67,5 @@ function validateProjectsIndex(index: ProjectsIndex, sourcePath: string): void {
 }
 
 function cloneProjectsIndex(index: ProjectsIndex): ProjectsIndex {
-  return JSON.parse(JSON.stringify(index)) as ProjectsIndex;
+  return structuredClone(index);
 }
