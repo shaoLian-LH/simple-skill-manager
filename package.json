@@ -15,9 +15,9 @@
     "node": ">=20"
   },
   "scripts": {
-    "build": "pnpm run build:web && tsup && node scripts/copy-ui-assets.mjs",
+    "build": "pnpm run build:cli && pnpm run build:web",
     "build:cli": "tsup",
-    "build:web": "vite build && node scripts/sync-ui-build.mjs",
+    "build:web": "vite build",
     "dev": "tsx src/bin/skm.ts",
     "dev:web": "vite",
     "test": "vitest run",

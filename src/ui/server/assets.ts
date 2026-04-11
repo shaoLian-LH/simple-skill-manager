@@ -24,10 +24,9 @@ async function pathExists(candidate: string): Promise<boolean> {
 
 export async function resolveWebAssetRoot(locale: UiLocale = DEFAULT_UI_LOCALE): Promise<string> {
   const currentDir = path.dirname(fileURLToPath(import.meta.url));
+  const repoRoot = path.resolve(currentDir, '..', '..', '..');
   const candidates = [
-    path.resolve(currentDir, '..', 'web'),
-    path.resolve(currentDir, 'ui', 'web'),
-    path.resolve(process.cwd(), 'src', 'ui', 'web'),
+    path.resolve(repoRoot, 'dist', 'ui', 'web'),
     path.resolve(process.cwd(), 'dist', 'ui', 'web'),
   ];
 

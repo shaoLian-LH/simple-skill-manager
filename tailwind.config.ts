@@ -6,7 +6,7 @@ import type { Config } from 'tailwindcss';
 const repoRoot = path.dirname(fileURLToPath(import.meta.url));
 
 export default {
-  content: [path.join(repoRoot, 'src/ui/web/app/**/*.{vue,ts,tsx,js,jsx,html}')],
+  content: [path.join(repoRoot, 'src/ui/web/**/*.{vue,ts,tsx,js,jsx,html}')],
   theme: {
     extend: {
       colors: {

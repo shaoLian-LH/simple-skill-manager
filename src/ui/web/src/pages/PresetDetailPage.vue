@@ -9,7 +9,8 @@ import { useSetQuickActions, useSetWorkspaceContext } from '../lib/chrome';
 import { useUiI18n } from '../lib/i18n';
 import { useLocalizedNavigation } from '../lib/navigation';
 import { resolveRequestErrorMessage } from '../lib/page';
-import { sourceStateLabel } from '../../../../text.js';
+import { buildPresetDeleteConfirmationMessage } from '../lib/preset';
+import { sourceStateLabel } from '../../../text.js';
 import type {
   PresetDeletePreviewView,
   PresetDeleteView,
@@ -134,24 +135,6 @@ async function toggleSkill(skill: PresetSkillMembershipView): Promise<void> {
   }
 }
 
-function buildDeleteConfirmation(preview: PresetDeletePreviewView): string {
-  if (preview.referenceProjects.length === 0) {
-    return t('presetDetail.deleteConfirmEmpty', { name: preview.name });
-  }
-
-  const affected = preview.referenceProjects
-    .slice(0, 8)
-    .map((project) => `- ${project.projectPath}`)
-    .join('\n');
-
-  const suffix = preview.referenceProjects.length > 8 ? '\n- ...' : '';
-  return t('presetDetail.deleteConfirmWithRefs', {
-    name: preview.name,
-    count: preview.referenceCount,
-    projects: affected + suffix,
-  });
-}
-
 async function deletePreset(): Promise<void> {
   const current = detail.value;
   if (!current || deleting.value) {
@@ -170,7 +153,7 @@ async function deletePreset(): Promise<void> {
       return;
     }
 
-    if (!window.confirm(buildDeleteConfirmation(preview))) {
+    if (!window.confirm(buildPresetDeleteConfirmationMessage(preview, locale.value))) {
       return;
     }
 

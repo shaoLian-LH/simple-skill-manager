@@ -3,7 +3,7 @@ import { createRouter, createWebHistory } from 'vue-router';
 
 import BootEntryPage from './pages/BootEntryPage.vue';
 import { getCurrentUiLocale, resolveUiLocaleFromQuery, setCurrentUiLocale } from './lib/i18n';
-import { translateUiText } from '../../../text.js';
+import { translateUiText } from '../../text.js';
 
 const pageModules = import.meta.glob('./pages/*.vue');
 

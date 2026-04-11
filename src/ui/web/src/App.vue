@@ -229,7 +229,7 @@ watch(
   () => [route.meta.titleKey, locale.value] as const,
   () => {
     document.documentElement.lang = locale.value;
-    document.title = `${routeTitle.value} · simple-skill-manager`;
+    document.title = `${routeTitle.value} · skm`;
   },
   { immediate: true },
 );

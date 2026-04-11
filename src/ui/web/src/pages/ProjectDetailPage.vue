@@ -8,7 +8,7 @@ import { apiRequest } from '../lib/api';
 import { useSetQuickActions, useSetWorkspaceContext } from '../lib/chrome';
 import { useUiI18n } from '../lib/i18n';
 import { resolveRequestErrorMessage, usePendingSet } from '../lib/page';
-import { sourceStateLabel } from '../../../../text.js';
+import { sourceStateLabel } from '../../../text.js';
 import type {
   ProjectDetailView,
   ProjectPresetControlView,

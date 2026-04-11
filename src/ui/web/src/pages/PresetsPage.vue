@@ -8,7 +8,7 @@ import { useSetQuickActions, useWorkspaceSpine } from '../lib/chrome';
 import { useUiI18n } from '../lib/i18n';
 import { useLocalizedNavigation } from '../lib/navigation';
 import { resolveRequestErrorMessage } from '../lib/page';
-import { sourceStateLabel } from '../../../../text.js';
+import { sourceStateLabel } from '../../../text.js';
 import type { PresetsView, PresetView } from '../types';
 
 const setQuickActions = useSetQuickActions();

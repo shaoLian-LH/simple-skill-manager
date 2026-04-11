@@ -7,6 +7,7 @@ import { runCli } from '../helpers/cli.js';
 import { createSkillFixtures } from '../helpers/fixtures.js';
 import { initConfigWithSkills } from '../helpers/skm-env.js';
 import { withTempDir } from '../helpers/temp.js';
+import { withMockUiBuild } from '../helpers/ui-build.js';
 import { UiFacade } from '../../src/ui/facade/service.js';
 import { startUiServer } from '../../src/ui/server/server.js';
 
@@ -18,29 +19,31 @@ describe.sequential('ui shell serving and quick-open endpoint', () => {
   });
 
   it('serves static assets and falls back to index for SPA routes', async () => {
-    const server = await startUiServer({ preferredPort: 0 });
+    await withMockUiBuild(async () => {
+      const server = await startUiServer({ preferredPort: 0 });
 
-    try {
-      const indexResponse = await fetch(`${server.launchStatus.url}/`);
-      expect(indexResponse.status).toBe(200);
-      expect(indexResponse.headers.get('content-type')).toContain('text/html');
-      expect(await indexResponse.text()).toContain('<div id="app"></div>');
+      try {
+        const indexResponse = await fetch(`${server.launchStatus.url}/`);
+        expect(indexResponse.status).toBe(200);
+        expect(indexResponse.headers.get('content-type')).toContain('text/html');
+        expect(await indexResponse.text()).toContain('<div id="app"></div>');
 
-      const cssResponse = await fetch(`${server.launchStatus.url}/assets/styles.css`);
-      expect(cssResponse.status).toBe(200);
-      expect(cssResponse.headers.get('content-type')).toContain('text/css');
+        const cssResponse = await fetch(`${server.launchStatus.url}/assets/styles.css`);
+        expect(cssResponse.status).toBe(200);
+        expect(cssResponse.headers.get('content-type')).toContain('text/css');
 
-      const spaFallbackResponse = await fetch(`${server.launchStatus.url}/projects/demo-id`);
-      expect(spaFallbackResponse.status).toBe(200);
-      const spaFallbackBody = await spaFallbackResponse.text();
-      expect(spaFallbackBody).toContain('/assets/app.js');
+        const spaFallbackResponse = await fetch(`${server.launchStatus.url}/projects/demo-id`);
+        expect(spaFallbackResponse.status).toBe(200);
+        const spaFallbackBody = await spaFallbackResponse.text();
+        expect(spaFallbackBody).toContain('/assets/app.js');
 
-      const overviewFallbackResponse = await fetch(`${server.launchStatus.url}/overview`);
-      expect(overviewFallbackResponse.status).toBe(200);
-      expect(await overviewFallbackResponse.text()).toContain('/assets/app.js');
-    } finally {
-      await server.stop();
-    }
+        const overviewFallbackResponse = await fetch(`${server.launchStatus.url}/overview`);
+        expect(overviewFallbackResponse.status).toBe(200);
+        expect(await overviewFallbackResponse.text()).toContain('/assets/app.js');
+      } finally {
+        await server.stop();
+      }
+    });
   });
 
   it('returns the host folder picker contract from the dedicated endpoint', async () => {

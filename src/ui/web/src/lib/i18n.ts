@@ -9,7 +9,7 @@ import {
   parseUiLocale,
   translateUiText,
   type UiLocale,
-} from '../../../../text.js';
+} from '../../../text.js';
 
 const currentLocale = ref<UiLocale>(DEFAULT_UI_LOCALE);
 

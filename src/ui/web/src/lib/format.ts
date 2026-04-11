@@ -3,7 +3,7 @@ import {
   formatUiRelativeTime,
   translateUiText,
   type UiLocale,
-} from '../../../../text.js';
+} from '../../../text.js';
 
 export function getLastPathSegment(input: string): string {
   const normalized = input.replace(/\\/g, '/').replace(/\/+$/, '');
