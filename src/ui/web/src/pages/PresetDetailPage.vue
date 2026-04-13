@@ -223,7 +223,7 @@ onMounted(() => {
         <section class="panel">
           <div class="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
             <div>
-              <p class="field-label">{{ t('presetDetail.skillMembership') }}</p>
+              <h3 class="section-heading">{{ t('presetDetail.skillMembership') }}</h3>
               <p class="mt-2 text-sm leading-6 text-muted">{{ t('presetDetail.membershipDescription') }}</p>
             </div>
             <div class="w-full md:w-[280px]">
@@ -264,7 +264,7 @@ onMounted(() => {
         </section>
 
         <aside class="panel">
-          <p class="field-label">{{ t('presetDetail.affectedProjects') }}</p>
+          <h3 class="section-heading">{{ t('presetDetail.affectedProjects') }}</h3>
           <p class="mt-2 text-sm leading-6 text-muted">
             {{ t('presetDetail.affectedProjectsDescription') }}
           </p>

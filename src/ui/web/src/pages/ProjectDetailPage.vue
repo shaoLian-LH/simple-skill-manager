@@ -245,7 +245,7 @@ onMounted(() => {
         <section class="panel">
           <div class="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
             <div>
-              <p class="field-label">{{ t('projectDetail.skills') }}</p>
+              <h3 class="section-heading">{{ t('projectDetail.skills') }}</h3>
               <p class="mt-2 text-sm leading-6 text-muted">{{ t('projectDetail.skillsDescription') }}</p>
             </div>
             <div class="w-full md:w-[280px]">
@@ -260,7 +260,7 @@ onMounted(() => {
 
           <div class="mt-4 space-y-4">
             <div>
-              <p class="field-label">{{ t('common.enabled') }}</p>
+              <h4 class="subsection-heading">{{ t('common.enabled') }}</h4>
               <ul v-if="filteredEnabledSkillRows.length > 0" class="skill-control-grid mt-3">
                 <li v-for="row in filteredEnabledSkillRows" :key="`enabled-skill-${row.name}`" class="skill-control-card">
                   <div class="min-w-0">
@@ -295,7 +295,7 @@ onMounted(() => {
             </div>
 
             <div>
-              <p class="field-label">{{ t('common.available') }}</p>
+              <h4 class="subsection-heading">{{ t('common.available') }}</h4>
               <ul v-if="filteredAvailableSkillRows.length > 0" class="skill-control-grid mt-3">
                 <li v-for="row in filteredAvailableSkillRows" :key="`available-skill-${row.name}`" class="skill-control-card">
                   <div class="min-w-0">
@@ -326,12 +326,12 @@ onMounted(() => {
         </section>
 
         <aside class="panel">
-          <p class="field-label">{{ t('projectDetail.presets') }}</p>
+          <h3 class="section-heading">{{ t('projectDetail.presets') }}</h3>
           <p class="mt-2 text-sm leading-6 text-muted">{{ t('projectDetail.presetsDescription') }}</p>
 
           <div class="mt-4 space-y-4">
             <div>
-              <p class="field-label">{{ t('common.enabled') }}</p>
+              <h4 class="subsection-heading">{{ t('common.enabled') }}</h4>
               <ul v-if="detail.presetControls.enabled.length > 0" class="mt-2 space-y-2">
                 <li v-for="row in detail.presetControls.enabled" :key="`enabled-preset-${row.name}`" class="preset-control-row">
                   <div class="min-w-0">
@@ -352,7 +352,7 @@ onMounted(() => {
             </div>
 
             <div>
-              <p class="field-label">{{ t('common.available') }}</p>
+              <h4 class="subsection-heading">{{ t('common.available') }}</h4>
               <ul v-if="detail.presetControls.available.length > 0" class="mt-2 space-y-2">
                 <li v-for="row in detail.presetControls.available" :key="`available-preset-${row.name}`" class="preset-control-row">
                   <div class="min-w-0">
@@ -376,7 +376,7 @@ onMounted(() => {
       </div>
 
       <aside class="panel">
-        <p class="field-label">{{ t('projectDetail.resolvedOutcome') }}</p>
+        <h3 class="section-heading">{{ t('projectDetail.resolvedOutcome') }}</h3>
         <p class="mt-2 text-sm leading-6 text-muted">{{ t('projectDetail.resolvedDescription') }}</p>
 
         <ul v-if="detail.resolvedSkills.length > 0" class="mt-4 space-y-2">

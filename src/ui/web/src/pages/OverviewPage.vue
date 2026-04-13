@@ -237,7 +237,7 @@ onMounted(() => {
 
     <template v-else-if="model">
       <section class="space-y-3">
-        <p class="field-label">{{ t('overview.recommendedActions') }}</p>
+        <h3 class="section-heading">{{ t('overview.recommendedActions') }}</h3>
         <ul class="overview-action-grid">
           <li v-for="action in model.recommendedActions.slice(0, 3)" :key="action.id" class="overview-action-card">
             <p class="font-semibold text-charcoal">{{ action.label }}</p>
@@ -254,7 +254,7 @@ onMounted(() => {
       </section>
 
       <section class="panel">
-        <p class="field-label">{{ t('overview.globalOverview') }}</p>
+        <h3 class="section-heading">{{ t('overview.globalOverview') }}</h3>
         <div class="mt-3 grid gap-3 md:grid-cols-3">
           <article class="metric-card">
             <p class="metric-label">{{ t('nav.projects') }}</p>
@@ -273,7 +273,7 @@ onMounted(() => {
 
       <section class="panel">
         <div class="flex items-center justify-between">
-          <p class="field-label">{{ t('overview.recentProjects') }}</p>
+          <h3 class="section-heading">{{ t('overview.recentProjects') }}</h3>
           <button type="button" class="btn-ghost" @click="openAction('/projects')">{{ t('common.viewAll') }}</button>
         </div>
         <ul v-if="model.recentProjects.length > 0" class="recent-project-grid mt-4">

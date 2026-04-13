@@ -24,10 +24,9 @@ function createMissingPage(labelKey: RouteTitleKey): Component {
     setup() {
       return () =>
         h('section', { class: 'panel' }, [
-          h('p', { class: 'field-label' }, translateUiText(getCurrentUiLocale(), labelKey)),
           h(
             'h3',
-            { class: 'mt-2 font-display text-2xl text-charcoal' },
+            { class: 'font-display text-2xl text-charcoal' },
             translateUiText(getCurrentUiLocale(), 'router.missing.notReady', {
               label: translateUiText(getCurrentUiLocale(), labelKey),
             }),
@@ -59,8 +58,7 @@ const NotFoundPage: Component = {
   setup() {
     return () =>
       h('section', { class: 'panel' }, [
-        h('p', { class: 'field-label' }, translateUiText(getCurrentUiLocale(), 'notFound.scopeLabel')),
-        h('h3', { class: 'mt-2 font-display text-2xl text-charcoal' }, translateUiText(getCurrentUiLocale(), 'notFound.title')),
+        h('h3', { class: 'font-display text-2xl text-charcoal' }, translateUiText(getCurrentUiLocale(), 'notFound.title')),
         h(
           'p',
           { class: 'mt-2 text-sm text-muted' },

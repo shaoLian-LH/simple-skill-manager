@@ -3,6 +3,7 @@ import { computed, nextTick, onBeforeUnmount, onMounted, provide, ref, watch } f
 import { RouterLink, RouterView, useRoute, useRouter } from 'vue-router';
 
 import { ApiRequestError, apiRequest } from './lib/api';
+import skmLogoUrl from './assets/skm-logo.png';
 import { bootViewKey, launchStatusKey, quickActionsKey, workspaceSpineKey } from './lib/chrome';
 import { useUiI18n } from './lib/i18n';
 import { animateRouteSwap } from './lib/motion';
@@ -265,10 +266,9 @@ watch(
       :aria-hidden="!navDrawerOpen"
     >
       <div class="space-y-6 nav-drawer__content" :class="{ 'nav-drawer__content--with-trigger': navDrawerOpen }">
-        <div>
-          <p class="brand-tag">{{ t('app.brandTag') }}</p>
-          <h1 class="brand-title">simple-skill-manager</h1>
-          <p class="brand-note">{{ t('app.brandNote') }}</p>
+        <div class="brand-lockup">
+          <img class="brand-logo" :src="skmLogoUrl" alt="" aria-hidden="true" />
+          <h1 class="brand-title">SKM</h1>
         </div>
 
         <nav class="space-y-2 text-sm">
@@ -289,10 +289,9 @@ watch(
     <div class="app-layout">
       <aside class="workbench-shell nav-shell">
         <div class="space-y-6">
-          <div>
-            <p class="brand-tag">{{ t('app.brandTag') }}</p>
-            <h1 class="brand-title">simple-skill-manager</h1>
-            <p class="brand-note">{{ t('app.brandNote') }}</p>
+          <div class="brand-lockup">
+            <img class="brand-logo" :src="skmLogoUrl" alt="" aria-hidden="true" />
+            <h1 class="brand-title">SKM</h1>
           </div>
 
           <nav class="space-y-2 text-sm">
@@ -332,7 +331,6 @@ watch(
         <main ref="stageRef" class="workbench-shell workspace-shell">
           <header class="workspace-header" :class="{ 'workspace-header--detail': hasHeaderOperators }">
             <div class="workspace-header-main">
-              <p class="field-label">{{ t('app.workspace') }}</p>
               <h2 class="workspace-title">{{ routeTitle }}</h2>
               <p class="workspace-desc">{{ routeDescription }}</p>
             </div>

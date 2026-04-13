@@ -361,32 +361,29 @@ onMounted(() => {
             @click="toggleCard(card.key)"
             @keydown="onCardKeydown($event, card.key)"
           >
-            <div class="skill-card-header">
-              <div class="skill-card-header__main">
-                <h4 class="mt-2 font-display text-2xl text-charcoal skill-card-title" :title="card.name">{{ card.name }}</h4>
-              </div>
-              <div class="skill-card-header__actions">
-                <button
-                  type="button"
-                  class="skill-status-toggle"
-                  :class="{ 'skill-status-toggle--enabled': card.globalEnabled }"
-                  :aria-pressed="card.globalEnabled"
-                  :disabled="isCardPending(card.key)"
-                  @keydown.stop
-                  @click.stop="toggleSkill(card)"
-                >
-                  {{
-                    isCardPending(card.key) ? t('common.updating') : card.globalEnabled ? t('common.enabled') : t('common.disabled')
-                  }}
-                </button>
-              </div>
-            </div>
+            <button
+              type="button"
+              class="skill-switch"
+              :class="{ 'skill-switch--enabled': card.globalEnabled }"
+              role="switch"
+              :aria-checked="card.globalEnabled"
+              :aria-label="`${card.name}: ${card.globalEnabled ? t('common.disable') : t('common.enable')}`"
+              :disabled="isCardPending(card.key)"
+              @keydown.stop
+              @click.stop="toggleSkill(card)"
+            >
+              <span class="skill-switch__track" :class="{ 'skill-switch__track--pending': isCardPending(card.key) }" aria-hidden="true">
+                <span class="skill-switch__knob" />
+              </span>
+            </button>
+
+            <h4 class="font-display text-2xl text-charcoal skill-card-title" :title="card.name">{{ card.name }}</h4>
 
             <p class="mt-3 text-sm leading-6 text-muted skills-description-clamp" :title="card.description">{{ card.description }}</p>
 
             <dl class="mt-4 grid gap-3 md:grid-cols-2">
               <div class="min-w-0">
-                <dt class="field-label">{{ t('skills.location') }}</dt>
+                <dt class="detail-term">{{ t('skills.location') }}</dt>
                 <dd class="mt-1">
                   <button
                     type="button"
@@ -405,7 +402,7 @@ onMounted(() => {
                 </dd>
               </div>
               <div>
-                <dt class="field-label">{{ t('skills.updated') }}</dt>
+                <dt class="detail-term">{{ t('skills.updated') }}</dt>
                 <dd class="mt-2 text-sm text-muted">{{ formatDateTime(card.updatedAt) }}</dd>
               </div>
             </dl>
@@ -420,19 +417,18 @@ onMounted(() => {
           >
             <div class="flex items-start justify-between gap-3">
               <div>
-                <p class="field-label">{{ t('skills.intersection') }}</p>
-                <h4 class="mt-2 font-display text-2xl text-charcoal" :title="card.name">{{ card.name }}</h4>
+                <h4 class="font-display text-2xl text-charcoal" :title="card.name">{{ card.name }}</h4>
               </div>
             </div>
 
-            <div class="mt-4 grid gap-4 md:grid-cols-2">
-              <section class="rounded-card bg-subtle p-4 shadow-card">
-                <p class="field-label">{{ t('skills.directProjects') }}</p>
-                <ul v-if="card.directProjects.length > 0" class="mt-2 space-y-2">
+            <div class="skill-back-list-grid">
+              <section class="skill-back-section">
+                <h5 class="subsection-heading">{{ t('skills.directProjects') }}</h5>
+                <ul v-if="card.directProjects.length > 0" class="skill-back-section__scroller">
                   <li
                     v-for="project in card.directProjects"
                     :key="`direct-${card.key}-${project.id}`"
-                    class="rounded-card bg-canvas px-3 py-3 text-sm text-charcoal shadow-card"
+                    class="skill-project-row"
                   >
                     <button
                       type="button"
@@ -451,13 +447,13 @@ onMounted(() => {
                 </p>
               </section>
 
-              <section class="rounded-card bg-subtle p-4 shadow-card">
-                <p class="field-label">{{ t('common.viaPreset') }}</p>
-                <ul v-if="card.viaPresetProjects.length > 0" class="mt-2 space-y-2">
+              <section class="skill-back-section">
+                <h5 class="subsection-heading">{{ t('common.viaPreset') }}</h5>
+                <ul v-if="card.viaPresetProjects.length > 0" class="skill-back-section__scroller">
                   <li
                     v-for="project in card.viaPresetProjects"
                     :key="`preset-${card.key}-${project.id}`"
-                    class="rounded-card bg-canvas px-3 py-3 text-sm text-charcoal shadow-card"
+                    class="skill-project-row"
                   >
                     <button
                       type="button"
@@ -491,7 +487,7 @@ onMounted(() => {
 
 .skill-card-inner {
   position: relative;
-  min-height: clamp(21rem, 30vw, 24rem);
+  min-height: 200px;
   height: 100%;
   transform-style: preserve-3d;
   transition: transform 380ms ease;
@@ -522,36 +518,23 @@ onMounted(() => {
 
 .skill-face-front {
   position: relative;
+  padding-top: 2.5rem;
 }
 
 .skill-face-back {
   position: absolute;
   inset: 0;
   transform: rotateY(180deg);
-  overflow: auto;
-}
-
-.skill-card-header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 0.75rem;
-}
-
-.skill-card-header__main {
-  min-width: 0;
-  flex: 1;
-}
-
-.skill-card-header__actions {
-  flex-shrink: 0;
+  overflow: hidden;
 }
 
 .skill-card-title {
   display: -webkit-box;
+  min-width: 0;
   overflow: hidden;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
+  line-height: 1.12;
 }
 
 .skill-location-button {
@@ -590,6 +573,48 @@ onMounted(() => {
   word-break: break-word;
 }
 
+.skill-back-list-grid {
+  display: grid;
+  flex: 1;
+  min-height: 0;
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.skill-back-section {
+  display: flex;
+  min-height: 0;
+  flex-direction: column;
+  background: #f5f5f5;
+  border-radius: 0.75rem;
+  padding: 1rem;
+  box-shadow: inset 0 0 0 1px rgba(34, 42, 53, 0.08);
+}
+
+.skill-back-section__scroller {
+  margin-top: 0.75rem;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.625rem;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.skill-back-section__scroller::-webkit-scrollbar {
+  display: none;
+}
+
+.skill-project-row {
+  border-radius: 0.75rem;
+  background: #ffffff;
+  padding: 0.75rem;
+  color: #242424;
+  box-shadow: inset 0 0 0 1px rgba(34, 42, 53, 0.08);
+}
+
 .skill-related-project-button {
   display: inline-flex;
   max-width: 100%;
@@ -615,6 +640,19 @@ onMounted(() => {
 .skill-related-project-button:disabled {
   cursor: wait;
   opacity: 0.72;
+}
+
+.skill-switch {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  z-index: 1;
+}
+
+@media (min-width: 768px) {
+  .skill-back-list-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 @media (max-width: 767px), (prefers-reduced-motion: reduce) {

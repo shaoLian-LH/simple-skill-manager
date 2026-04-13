@@ -183,7 +183,6 @@ a {
   padding-top: 3.5rem;
 }
 
-.brand-tag,
 .eyebrow {
   @apply text-[11px] font-semibold uppercase tracking-[0.18em] text-muted;
   font-family:
@@ -195,12 +194,16 @@ a {
     sans-serif;
 }
 
-.brand-title {
-  @apply mt-2 font-display text-[1.625rem] font-semibold leading-[1.1] tracking-[-0.03em] text-charcoal;
+.brand-lockup {
+  @apply flex items-center gap-3;
 }
 
-.brand-note {
-  @apply mt-2 max-w-[24rem] text-sm leading-6 text-muted;
+.brand-logo {
+  @apply h-10 w-10 shrink-0 rounded-button bg-canvas object-contain p-1 shadow-card;
+}
+
+.brand-title {
+  @apply font-display text-[1.625rem] font-semibold leading-[1.1] tracking-[-0.03em] text-charcoal;
 }
 
 .nav-link {
@@ -365,15 +368,22 @@ a {
   @apply rounded-shell bg-canvas p-5 shadow-card md:p-6;
 }
 
-.field-label {
-  @apply text-[11px] font-semibold uppercase tracking-[0.16em] text-muted;
-  font-family:
-    "Avenir Next",
-    "Inter",
-    "Segoe UI",
-    ui-sans-serif,
-    system-ui,
-    sans-serif;
+.section-heading {
+  @apply font-display text-xl font-semibold leading-tight tracking-[-0.02em] text-charcoal;
+}
+
+.subsection-heading,
+.detail-term,
+.form-label {
+  @apply text-sm font-semibold leading-tight text-charcoal;
+}
+
+.detail-term {
+  @apply text-xs text-muted;
+}
+
+.form-label {
+  display: block;
 }
 
 .text-input {
@@ -524,26 +534,63 @@ a {
   -webkit-line-clamp: 4;
 }
 
-.skill-status-toggle {
-  @apply inline-flex min-w-[6.5rem] items-center justify-center rounded-pill px-4 py-2 text-xs font-semibold text-charcoal transition-all;
-  box-shadow: inset 0 0 0 1px rgba(34, 42, 53, 0.1);
-  background: #ffffff;
+.skill-switch {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #242424;
+  transition: opacity 160ms ease;
 }
 
-.skill-status-toggle:hover:not(:disabled) {
-  background: #f5f5f5;
-  box-shadow: inset 0 0 0 1px rgba(34, 42, 53, 0.14);
+.skill-switch:hover:not(:disabled) {
+  opacity: 0.84;
 }
 
-.skill-status-toggle:disabled {
+.skill-switch:disabled {
   cursor: wait;
-  opacity: 0.7;
+  opacity: 0.58;
 }
 
-.skill-status-toggle--enabled {
+.skill-switch__track {
+  position: relative;
+  width: 2.25rem;
+  height: 1.25rem;
+  flex-shrink: 0;
+  border-radius: 9999px;
+  background: #f5f5f5;
+  box-shadow: inset 0 0 0 1px rgba(34, 42, 53, 0.12);
+  transition:
+    background-color 160ms ease,
+    box-shadow 160ms ease;
+}
+
+.skill-switch__knob {
+  position: absolute;
+  top: 0.1875rem;
+  left: 0.1875rem;
+  width: 0.875rem;
+  height: 0.875rem;
+  border-radius: 9999px;
   background: #242424;
-  color: #ffffff;
-  box-shadow: rgba(255, 255, 255, 0.15) 0px 2px 0px inset;
+  transition: transform 160ms ease;
+}
+
+.skill-switch__track--pending {
+  box-shadow:
+    inset 0 0 0 1px rgba(34, 42, 53, 0.16),
+    0 0 0 3px rgba(34, 42, 53, 0.06);
+}
+
+.skill-switch--enabled .skill-switch__track {
+  background: #242424;
+}
+
+.skill-switch--enabled .skill-switch__knob {
+  background: #ffffff;
+  transform: translateX(1rem);
 }
 
 .workspace-page {

@@ -272,10 +272,10 @@ onMounted(() => {
       </section>
 
       <section class="panel">
-        <p class="field-label">{{ t('config.workspaceConfig') }}</p>
+        <h3 class="section-heading">{{ t('config.workspaceConfig') }}</h3>
 
         <div class="mt-3">
-          <label class="field-label" for="skills-dir-input">skillsDir</label>
+          <label class="form-label" for="skills-dir-input">skillsDir</label>
           <input
             id="skills-dir-input"
             v-model="draftSkillsDir"
@@ -304,7 +304,7 @@ onMounted(() => {
         </div>
 
         <div class="mt-5">
-          <p class="field-label">defaultTargets</p>
+          <h4 class="subsection-heading">defaultTargets</h4>
           <div class="mt-2 flex flex-wrap gap-2">
             <button
               v-for="target in availableTargets"
@@ -335,7 +335,7 @@ onMounted(() => {
       </section>
 
       <section class="panel">
-        <p class="field-label">{{ t('config.storagePaths') }}</p>
+        <h3 class="section-heading">{{ t('config.storagePaths') }}</h3>
         <p class="mt-2 text-sm leading-6 text-muted">{{ t('config.storagePathsDescription') }}</p>
         <ul class="mt-4 space-y-3 text-sm leading-6 text-muted">
           <li class="break-all">
