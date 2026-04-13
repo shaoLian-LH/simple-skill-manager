@@ -39,6 +39,7 @@ describe('TtyPromptAdapter', () => {
         {
           value: 'brainstorming',
           name: 'brainstorming',
+          description: 'Generate many candidate ideas quickly.',
           short: 'brainstorming',
         },
         { value: 'test-engineer', name: 'test-engineer', short: 'test-engineer' },
@@ -69,6 +70,7 @@ describe('TtyPromptAdapter', () => {
       {
         value: '.agents',
         name: '.agents',
+        description: 'Install into .agents/skills.',
         short: '.agents',
         checked: true,
       },

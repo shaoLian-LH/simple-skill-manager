@@ -12,7 +12,19 @@ import {
 } from '../core/activation/service.js';
 import { loadConfig, initGlobalConfig, setSkillsDir } from '../core/config/service.js';
 import { ExitCode, SkmError, formatError } from '../core/errors.js';
-import { renderJson, renderMessage } from '../core/output/render.js';
+import {
+  renderActivationText,
+  renderConfigInitText,
+  renderConfigSummaryText,
+  renderDoctorText,
+  renderMessage,
+  renderPresetInspectText,
+  renderPresetListText,
+  renderPresetMutationText,
+  renderSkillInspectText,
+  renderSkillListText,
+  renderStructuredOutput,
+} from '../core/output/render.js';
 import {
   addPresetDefinition,
   deletePresetDefinition,
@@ -123,8 +135,17 @@ function createProgram(deps: CliDependencies = {}): Command {
   program
     .name('skm')
     .description('Manage globally registered skills and project-local target linking.')
+    .option('--json', 'Print structured command results as JSON.')
     .showHelpAfterError()
     .exitOverride();
+
+  function isJsonOutputEnabled(): boolean {
+    return Boolean(program.opts<{ json?: boolean }>().json);
+  }
+
+  function printStructuredResult<T>(value: T, text: string): void {
+    printStdout(renderStructuredOutput(value, text, { json: isJsonOutputEnabled() }));
+  }
 
   const configCommand = program.command('config').description('Manage global simple-skill-manager configuration.');
 
@@ -133,13 +154,12 @@ function createProgram(deps: CliDependencies = {}): Command {
     .description('Initialize the global simple-skill-manager directory and default files.')
     .action(async () => {
       const result = await initGlobalConfig();
-      printStdout(
-        renderJson({
-          appDir: result.paths.appDir,
-          created: result.created.map(toDisplayPath),
-          skipped: result.skipped.map(toDisplayPath),
-        }),
-      );
+      const payload = {
+        appDir: result.paths.appDir,
+        created: result.created.map(toDisplayPath),
+        skipped: result.skipped.map(toDisplayPath),
+      };
+      printStructuredResult(payload, renderConfigInitText(payload));
     });
 
   configCommand
@@ -147,7 +167,8 @@ function createProgram(deps: CliDependencies = {}): Command {
     .description('Print the current global configuration.')
     .action(async () => {
       const { config, paths } = await loadConfig();
-      printStdout(renderJson({ ...config, appDir: paths.appDir }));
+      const payload = { ...config, appDir: paths.appDir };
+      printStructuredResult(payload, renderConfigSummaryText(payload, 'Current configuration'));
     });
 
   configCommand
@@ -157,7 +178,7 @@ function createProgram(deps: CliDependencies = {}): Command {
     .description('Set the global skills directory to an existing path.')
     .action(async (nextPath: string) => {
       const config = await setSkillsDir(nextPath);
-      printStdout(renderJson(config));
+      printStructuredResult(config, renderConfigSummaryText(config, 'Updated skills directory'));
     });
 
   const skillCommand = program.command('skill').description('Inspect and manage globally available skills in this project.');
@@ -167,15 +188,12 @@ function createProgram(deps: CliDependencies = {}): Command {
     .description('List all discovered skills in the configured skillsDir.')
     .action(async () => {
       const skills = await withLoadedConfig((skillsDir) => listSkills(skillsDir));
-      printStdout(
-        renderJson(
-          skills.map((skill) => ({
-            name: skill.name,
-            path: skill.dirPath,
-            description: skill.description,
-          })),
-        ),
-      );
+      const payload = skills.map((skill) => ({
+        name: skill.name,
+        path: skill.dirPath,
+        description: skill.description,
+      }));
+      printStructuredResult(payload, renderSkillListText(payload));
     });
 
   skillCommand
@@ -196,7 +214,8 @@ function createProgram(deps: CliDependencies = {}): Command {
         'Run `skm skill inspect <name>`.',
       );
       const skill = await withLoadedConfig((skillsDir) => getSkillByName(skillsDir, collected.value));
-      printStdout(renderJson(toSkillInspectView(skill)));
+      const payload = toSkillInspectView(skill);
+      printStructuredResult(payload, renderSkillInspectText(payload));
     });
 
   skillCommand
@@ -246,7 +265,16 @@ function createProgram(deps: CliDependencies = {}): Command {
         skillNames: selectedSkills.values,
         targets: selectedTargets.targets,
       });
-      printStdout(renderJson(state));
+      printStructuredResult(
+        state,
+        renderActivationText({
+          title: 'Enabled skills',
+          scope,
+          selectionLabel: 'Requested skills',
+          selectedNames: selectedSkills.values,
+          state,
+        }),
+      );
     });
 
   skillCommand
@@ -283,7 +311,16 @@ function createProgram(deps: CliDependencies = {}): Command {
         projectPath: scope === 'project' ? process.cwd() : undefined,
         skillNames: selected.values,
       });
-      printStdout(renderJson(state));
+      printStructuredResult(
+        state,
+        renderActivationText({
+          title: 'Disabled skills',
+          scope,
+          selectionLabel: 'Removed skills',
+          selectedNames: selected.values,
+          state,
+        }),
+      );
     });
 
   const presetCommand = program.command('preset').description('Inspect, manage, and apply globally configured skill presets.');
@@ -293,16 +330,13 @@ function createProgram(deps: CliDependencies = {}): Command {
     .description('List all configured presets.')
     .action(async () => {
       const presets = await listPresetDefinitions();
-      printStdout(
-        renderJson(
-          presets.map((preset) => ({
-            name: preset.name,
-            skillCount: preset.skills.length,
-            source: preset.source,
-            readonly: preset.readonly,
-          })),
-        ),
-      );
+      const payload = presets.map((preset) => ({
+        name: preset.name,
+        skillCount: preset.skills.length,
+        source: preset.source,
+        readonly: preset.readonly,
+      }));
+      printStructuredResult(payload, renderPresetListText(payload));
     });
 
   presetCommand
@@ -324,7 +358,8 @@ function createProgram(deps: CliDependencies = {}): Command {
       );
       const skills = await getPresetByName(collected.value);
       const preset = presets.find((entry) => entry.name === collected.value);
-      printStdout(renderJson({ name: collected.value, skills, source: preset?.source ?? 'static', readonly: preset?.readonly ?? false }));
+      const payload = { name: collected.value, skills, source: preset?.source ?? 'static', readonly: preset?.readonly ?? false };
+      printStructuredResult(payload, renderPresetInspectText(payload));
     });
 
   presetCommand
@@ -375,7 +410,16 @@ function createProgram(deps: CliDependencies = {}): Command {
         presetNames: selectedPresets.values,
         targets: selectedTargets.targets,
       });
-      printStdout(renderJson(state));
+      printStructuredResult(
+        state,
+        renderActivationText({
+          title: 'Enabled presets',
+          scope,
+          selectionLabel: 'Requested presets',
+          selectedNames: selectedPresets.values,
+          state,
+        }),
+      );
     });
 
   presetCommand
@@ -412,7 +456,16 @@ function createProgram(deps: CliDependencies = {}): Command {
         projectPath: scope === 'project' ? process.cwd() : undefined,
         presetNames: selected.values,
       });
-      printStdout(renderJson(state));
+      printStructuredResult(
+        state,
+        renderActivationText({
+          title: 'Disabled presets',
+          scope,
+          selectionLabel: 'Removed presets',
+          selectedNames: selected.values,
+          state,
+        }),
+      );
     });
 
   presetCommand
@@ -466,7 +519,7 @@ function createProgram(deps: CliDependencies = {}): Command {
       }
 
       const created = await addPresetDefinition({ name: presetName, skills: normalizedSkills });
-      printStdout(renderJson(created));
+      printStructuredResult(created, renderPresetMutationText(created, 'Created preset'));
     });
 
   presetCommand
@@ -523,7 +576,7 @@ function createProgram(deps: CliDependencies = {}): Command {
       }
 
       const updated = await updatePresetDefinition({ name: collectedName.value, skills: normalizedSkills });
-      printStdout(renderJson(updated));
+      printStructuredResult(updated, renderPresetMutationText(updated, 'Updated preset'));
     });
 
   presetCommand
@@ -573,7 +626,8 @@ function createProgram(deps: CliDependencies = {}): Command {
       }
 
       await deletePresetDefinition(collected.value);
-      printStdout(renderJson({ name: collected.value, referencedProjects: references.length, deleted: true }));
+      const payload = { name: collected.value, referencedProjects: references.length, deleted: true };
+      printStructuredResult(payload, renderPresetMutationText(payload, 'Removed preset'));
     });
 
   program
@@ -581,8 +635,16 @@ function createProgram(deps: CliDependencies = {}): Command {
     .description('Reconcile target installations so they match the selected scope state.')
     .option('--global', 'Sync global scope instead of the current project.')
     .action(async (options: { global?: boolean }) => {
-      const state = options.global ? await syncGlobal() : await syncProject(process.cwd());
-      printStdout(renderJson(state));
+      const scope: ActivationScope = options.global ? 'global' : 'project';
+      const state = scope === 'global' ? await syncGlobal() : await syncProject(process.cwd());
+      printStructuredResult(
+        state,
+        renderActivationText({
+          title: 'Synced scope state',
+          scope,
+          state,
+        }),
+      );
     });
 
   program
@@ -590,8 +652,10 @@ function createProgram(deps: CliDependencies = {}): Command {
     .description('Inspect selected scope drift, missing sources, stale index, and missing preset definitions.')
     .option('--global', 'Inspect global scope instead of the current project.')
     .action(async (options: { global?: boolean }) => {
-      const issues = options.global ? await doctorGlobal() : await doctorProject(process.cwd());
-      printStdout(renderJson({ ok: issues.length === 0, issues }));
+      const scope: ActivationScope = options.global ? 'global' : 'project';
+      const issues = scope === 'global' ? await doctorGlobal() : await doctorProject(process.cwd());
+      const payload = { ok: issues.length === 0, issues };
+      printStructuredResult(payload, renderDoctorText(scope, payload));
     });
 
   program

@@ -41,17 +41,14 @@ async function runPrompt<T>(factory: () => Promise<T>): Promise<T> {
 function toNamedChoices(choices: PromptChoice[]): Array<{ value: string; name: string; short: string }> {
   return choices.map((choice) => ({
     value: choice.value,
-    name: formatChoiceLabel(choice),
+    name: choice.label,
+    description: choice.description,
     short: choice.label,
   }));
 }
 
 function normalizeAnswer(answer: string): string {
   return answer.trim();
-}
-
-function formatChoiceLabel(choice: PromptChoice): string {
-  return `${choice.label}`;
 }
 
 const PROMPT_PAGE_SIZE = 20;

@@ -5,6 +5,15 @@ import { toDisplayPath } from '../utils/path.js';
 import { createBodyPreview } from './skill-frontmatter.js';
 import { listDiscoveredSkills } from './skill-catalog.js';
 
+export interface SkillInspectView {
+  name: string;
+  description: string;
+  dirPath: string;
+  skillFilePath: string;
+  frontmatter: Record<string, unknown>;
+  bodyPreview: string;
+}
+
 export async function listSkills(skillsDir: string): Promise<SkillDefinition[]> {
   return listDiscoveredSkills(skillsDir);
 }
@@ -22,7 +31,7 @@ export async function getSkillByName(skillsDir: string, skillName: string): Prom
   return match;
 }
 
-export function toSkillInspectView(skill: SkillDefinition): Record<string, unknown> {
+export function toSkillInspectView(skill: SkillDefinition): SkillInspectView {
   return {
     name: skill.name,
     description: skill.description,

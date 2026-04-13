@@ -37,7 +37,7 @@ describe('interactive workflows', () => {
         return true;
       });
 
-      const exitCode = await runCli(['node', 'skm', 'skill', 'inspect'], {
+      const exitCode = await runCli(['node', 'skm', '--json', 'skill', 'inspect'], {
         promptAdapter,
         isInteractiveSession: () => true,
       });

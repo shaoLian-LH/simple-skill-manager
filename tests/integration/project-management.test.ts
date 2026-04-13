@@ -6,7 +6,7 @@ import { describe, expect, it } from 'vitest';
 import { createSkillFixtures, writePresetsFile } from '../helpers/fixtures.js';
 import { initConfigWithSkills, readGlobalState, readProjectState, readProjectsIndex } from '../helpers/skm-env.js';
 import { withTempDir } from '../helpers/temp.js';
-import { runCli, runCliExpectFailure } from '../helpers/cli.js';
+import { runCli, runCliExpectFailure, runCliJson } from '../helpers/cli.js';
 
 function globalAppDir(homeDir: string): string {
   return path.join(homeDir, '.simple-skill-manager');
@@ -23,11 +23,11 @@ describe('project activation and maintenance', () => {
         ]);
         await initConfigWithSkills(homeDir, skillsDir);
 
-        await runCli(['skill', 'on', 'brainstorming', '--target', '.agents'], {
+        const firstEnable = await runCli(['skill', 'on', 'brainstorming', '--target', '.agents'], {
           cwd: projectDir,
           env: { HOME: homeDir },
         });
-        await runCli(['skill', 'on', 'brainstorming', '--target', '.agents'], {
+        const secondEnable = await runCli(['skill', 'on', 'brainstorming', '--target', '.agents'], {
           cwd: projectDir,
           env: { HOME: homeDir },
         });
@@ -44,6 +44,10 @@ describe('project activation and maintenance', () => {
         const installStats = await fs.lstat(installPath);
         const gitignore = await fs.readFile(path.join(projectDir, '.gitignore'), 'utf8');
 
+        expect(firstEnable.stdout).toContain('Enabled skills');
+        expect(firstEnable.stdout).toContain('Requested skills: brainstorming');
+        expect(firstEnable.stdout).toContain('.agents (1 skill): brainstorming');
+        expect(secondEnable.stdout).toContain('Enabled skills');
         expect(state.enabledSkills).toEqual(['brainstorming']);
         expect(state.enabledPresets).toEqual([]);
         const agentTarget = state.targets['.agents'];
@@ -146,9 +150,15 @@ describe('project activation and maintenance', () => {
         );
 
         await runCli(['skill', 'on', 'brainstorming', '--target', '.agents'], { cwd: projectDir, env: { HOME: homeDir } });
-        await runCli(['preset', 'on', 'frontend-basic', '--target', '.agents'], { cwd: projectDir, env: { HOME: homeDir } });
-        await runCli(['skill', 'off', 'brainstorming'], { cwd: projectDir, env: { HOME: homeDir } });
+        const presetEnable = await runCli(['preset', 'on', 'frontend-basic', '--target', '.agents'], {
+          cwd: projectDir,
+          env: { HOME: homeDir },
+        });
+        const skillDisable = await runCli(['skill', 'off', 'brainstorming'], { cwd: projectDir, env: { HOME: homeDir } });
 
+        expect(presetEnable.stdout).toContain('Enabled presets');
+        expect(presetEnable.stdout).toContain('Requested presets: frontend-basic');
+        expect(skillDisable.stdout).toContain('Disabled skills');
         let state = (await readProjectState(projectDir)) as {
           enabledSkills: string[];
           enabledPresets: string[];
@@ -160,7 +170,8 @@ describe('project activation and maintenance', () => {
         expect(agentTarget).toBeDefined();
         expect(Object.keys(agentTarget!.skills).sort()).toEqual(['brainstorming', 'test-engineer']);
 
-        await runCli(['preset', 'off', 'frontend-basic'], { cwd: projectDir, env: { HOME: homeDir } });
+        const presetDisable = await runCli(['preset', 'off', 'frontend-basic'], { cwd: projectDir, env: { HOME: homeDir } });
+        expect(presetDisable.stdout).toContain('Disabled presets');
         state = (await readProjectState(projectDir)) as {
           enabledSkills: string[];
           enabledPresets: string[];
@@ -205,14 +216,21 @@ describe('project activation and maintenance', () => {
         await fs.writeFile(projectsFile, `${JSON.stringify(staleIndex, null, 2)}\n`, 'utf8');
 
         const doctor = await runCli(['doctor'], { cwd: projectDir, env: { HOME: homeDir } });
-        const doctorJson = JSON.parse(doctor.stdout) as { ok: boolean; issues: Array<{ type: string }> };
+        const doctorJson = JSON.parse((await runCliJson(['doctor'], { cwd: projectDir, env: { HOME: homeDir } })).stdout) as {
+          ok: boolean;
+          issues: Array<{ type: string }>;
+        };
+        expect(doctor.stdout).toContain('Doctor found 2 issues');
+        expect(doctor.stdout).toContain('Missing installation (1)');
+        expect(doctor.stdout).toContain('Stale global index (1)');
         expect(doctorJson.ok).toBe(false);
         expect(doctorJson.issues.map((issue) => issue.type)).toEqual(
           expect.arrayContaining(['missing-installation', 'stale-global-index']),
         );
 
-        await runCli(['sync'], { cwd: projectDir, env: { HOME: homeDir } });
-        const healedDoctor = JSON.parse((await runCli(['doctor'], { cwd: projectDir, env: { HOME: homeDir } })).stdout) as {
+        const sync = await runCli(['sync'], { cwd: projectDir, env: { HOME: homeDir } });
+        expect(sync.stdout).toContain('Synced scope state');
+        const healedDoctor = JSON.parse((await runCliJson(['doctor'], { cwd: projectDir, env: { HOME: homeDir } })).stdout) as {
           ok: boolean;
           issues: Array<{ type: string }>;
         };
@@ -269,7 +287,7 @@ describe('project activation and maintenance', () => {
         await initConfigWithSkills(homeDir, skillsDir);
         await runCli(['preset', 'on', 'impeccable', '--target', '.agents'], { cwd: projectDir, env: { HOME: homeDir } });
 
-        const initialDoctor = JSON.parse((await runCli(['doctor'], { cwd: projectDir, env: { HOME: homeDir } })).stdout) as {
+        const initialDoctor = JSON.parse((await runCliJson(['doctor'], { cwd: projectDir, env: { HOME: homeDir } })).stdout) as {
           ok: boolean;
         };
         expect(initialDoctor.ok).toBe(true);
@@ -277,7 +295,7 @@ describe('project activation and maintenance', () => {
         await fs.rm(path.join(projectDir, '.agents', 'skills', 'impeccable', 'polish'), { recursive: true, force: true });
         await runCli(['sync'], { cwd: projectDir, env: { HOME: homeDir } });
 
-        const healedDoctor = JSON.parse((await runCli(['doctor'], { cwd: projectDir, env: { HOME: homeDir } })).stdout) as {
+        const healedDoctor = JSON.parse((await runCliJson(['doctor'], { cwd: projectDir, env: { HOME: homeDir } })).stdout) as {
           ok: boolean;
           issues: Array<{ type: string }>;
         };
@@ -384,12 +402,16 @@ describe('project activation and maintenance', () => {
       await fs.rm(path.join(homeDir, '.agents', 'skills', 'brainstorming'), { recursive: true, force: true });
 
       const doctor = await runCli(['doctor', '--global'], { env: { HOME: homeDir } });
-      const doctorJson = JSON.parse(doctor.stdout) as { ok: boolean; issues: Array<{ type: string }> };
+      const doctorJson = JSON.parse((await runCliJson(['doctor', '--global'], { env: { HOME: homeDir } })).stdout) as {
+        ok: boolean;
+        issues: Array<{ type: string }>;
+      };
+      expect(doctor.stdout).toContain('Doctor found 1 issue');
       expect(doctorJson.ok).toBe(false);
       expect(doctorJson.issues.map((issue) => issue.type)).toEqual(expect.arrayContaining(['missing-installation']));
 
       await runCli(['sync', '--global'], { env: { HOME: homeDir } });
-      const healedDoctor = JSON.parse((await runCli(['doctor', '--global'], { env: { HOME: homeDir } })).stdout) as {
+      const healedDoctor = JSON.parse((await runCliJson(['doctor', '--global'], { env: { HOME: homeDir } })).stdout) as {
         ok: boolean;
         issues: Array<{ type: string }>;
       };

@@ -3,7 +3,7 @@ import path from 'node:path';
 
 import { describe, expect, it } from 'vitest';
 
-import { runCli, runCliExpectFailure } from '../helpers/cli.js';
+import { runCli, runCliExpectFailure, runCliJson } from '../helpers/cli.js';
 import { createSkillFixtures } from '../helpers/fixtures.js';
 import { initConfigWithSkills, readProjectState } from '../helpers/skm-env.js';
 import { withTempDir } from '../helpers/temp.js';
@@ -30,7 +30,9 @@ describe('v2 CLI roadmap', () => {
         ]);
         await initConfigWithSkills(homeDir, skillsDir);
 
-        await runCli(['preset', 'create', 'frontend-v2', 'brainstorming', 'test-engineer'], { env: { HOME: homeDir } });
+        const createPreset = await runCli(['preset', 'create', 'frontend-v2', 'brainstorming', 'test-engineer'], {
+          env: { HOME: homeDir },
+        });
         await runCli(['skill', 'on', 'brainstorming', 'code-review-process', '--target', '.agents'], {
           cwd: projectDir,
           env: { HOME: homeDir },
@@ -49,6 +51,7 @@ describe('v2 CLI roadmap', () => {
           targets: Record<string, { skills: Record<string, unknown> }>;
         };
 
+        expect(createPreset.stdout).toContain('Created preset');
         expect(state.enabledSkills).toEqual([]);
         expect(state.enabledPresets).toEqual(['frontend-v2']);
         expect(Object.keys(state.targets['.agents']!.skills).sort()).toEqual(['brainstorming', 'test-engineer']);
@@ -138,17 +141,24 @@ describe('v2 CLI roadmap', () => {
         await initConfigWithSkills(homeDir, skillsDir);
 
         await runCli(['preset', 'create', 'frontend-v2', 'brainstorming', 'test-engineer'], { env: { HOME: homeDir } });
-        await runCli(['preset', 'update', 'frontend-v2', 'brainstorming'], { env: { HOME: homeDir } });
+        const updated = await runCli(['preset', 'update', 'frontend-v2', 'brainstorming'], { env: { HOME: homeDir } });
         const inspect = await runCli(['preset', 'inspect', 'frontend-v2'], { env: { HOME: homeDir } });
-        expect(JSON.parse(inspect.stdout)).toEqual({ name: 'frontend-v2', skills: ['brainstorming'], source: 'static', readonly: false });
+        const inspectJson = await runCliJson(['preset', 'inspect', 'frontend-v2'], { env: { HOME: homeDir } });
+        expect(updated.stdout).toContain('Updated preset');
+        expect(inspect.stdout).toContain('Preset: frontend-v2');
+        expect(JSON.parse(inspectJson.stdout)).toEqual({ name: 'frontend-v2', skills: ['brainstorming'], source: 'static', readonly: false });
 
         await runCli(['preset', 'on', 'frontend-v2', '--target', '.agents'], { cwd: projectDir, env: { HOME: homeDir } });
-        const deleted = await runCli(['preset', 'rm', 'frontend-v2'], { env: { HOME: homeDir } });
-        expect(JSON.parse(deleted.stdout)).toMatchObject({ name: 'frontend-v2', deleted: true, referencedProjects: 1 });
-        expect(deleted.stderr).toContain('Warning: Preset frontend-v2 is still referenced');
+        const deletedJson = await runCliJson(['preset', 'rm', 'frontend-v2'], { env: { HOME: homeDir } });
+        expect(JSON.parse(deletedJson.stdout)).toMatchObject({ name: 'frontend-v2', deleted: true, referencedProjects: 1 });
+        expect(deletedJson.stderr).toContain('Warning: Preset frontend-v2 is still referenced');
 
         const doctor = await runCli(['doctor'], { cwd: projectDir, env: { HOME: homeDir } });
-        const doctorJson = JSON.parse(doctor.stdout) as { ok: boolean; issues: Array<{ type: string; presetName?: string }> };
+        const doctorJson = JSON.parse((await runCliJson(['doctor'], { cwd: projectDir, env: { HOME: homeDir } })).stdout) as {
+          ok: boolean;
+          issues: Array<{ type: string; presetName?: string }>;
+        };
+        expect(doctor.stdout).toContain('Missing preset definition');
         expect(doctorJson.ok).toBe(false);
         expect(doctorJson.issues).toEqual(
           expect.arrayContaining([expect.objectContaining({ type: 'missing-preset-definition', presetName: 'frontend-v2' })]),

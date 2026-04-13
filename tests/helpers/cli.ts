@@ -23,6 +23,10 @@ export async function runCli(args: string[], options: RunCliOptions = {}): Promi
   });
 }
 
+export async function runCliJson(args: string[], options: RunCliOptions = {}): Promise<{ stdout: string; stderr: string }> {
+  return runCli(['--json', ...args], options);
+}
+
 export async function runCliExpectFailure(
   args: string[],
   options: RunCliOptions = {},
