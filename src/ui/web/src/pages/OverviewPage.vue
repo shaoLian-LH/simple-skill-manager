@@ -291,12 +291,12 @@ onMounted(() => {
             <div class="recent-project-card__footer">
               <div class="recent-project-card__summary">
                 <div class="recent-project-card__summary-item">
-                  <p class="detail-term">{{ t('nav.skills') }}</p>
-                  <p class="recent-project-card__summary-value">{{ project.enabledSkillCount }}</p>
-                </div>
-                <div class="recent-project-card__summary-item">
                   <p class="detail-term">{{ t('nav.presets') }}</p>
                   <p class="recent-project-card__summary-value">{{ project.enabledPresetCount }}</p>
+                </div>
+                <div class="recent-project-card__summary-item">
+                  <p class="detail-term">{{ t('nav.skills') }}</p>
+                  <p class="recent-project-card__summary-value">{{ project.enabledSkillCount }}</p>
                 </div>
               </div>
               <div class="recent-project-card__footer-meta">

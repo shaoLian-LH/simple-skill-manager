@@ -5,8 +5,11 @@ const props = withDefaults(
     modelValue: string;
     label: string;
     placeholder: string;
+    hideLabel?: boolean;
   }>(),
-  {},
+  {
+    hideLabel: false,
+  },
 );
 
 const emit = defineEmits<{
@@ -21,7 +24,7 @@ function updateValue(event: Event): void {
 
 <template>
   <header class="page-search-bar">
-    <label class="page-search-bar__label" :for="props.id">{{ props.label }}</label>
+    <label v-if="!props.hideLabel" class="page-search-bar__label" :for="props.id">{{ props.label }}</label>
     <div class="page-search-bar__input">
       <input
         :id="props.id"
@@ -29,6 +32,7 @@ function updateValue(event: Event): void {
         class="text-input"
         type="search"
         :placeholder="props.placeholder"
+        :aria-label="props.hideLabel ? props.label : undefined"
         @input="updateValue"
       />
     </div>

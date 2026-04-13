@@ -5,6 +5,7 @@ import { useRoute } from 'vue-router';
 import PageSearchBar from '../components/PageSearchBar.vue';
 import PageStatePanel from '../components/PageStatePanel.vue';
 import SkillToggleSwitch from '../components/SkillToggleSwitch.vue';
+import SwitchButtonCard from '../components/SwitchButtonCard.vue';
 import { apiRequest } from '../lib/api';
 import { useSetQuickActions, useSetWorkspaceContext } from '../lib/chrome';
 import { useUiI18n } from '../lib/i18n';
@@ -14,7 +15,6 @@ import type {
   ProjectDetailView,
   ProjectPresetControlView,
   ProjectSkillControlView,
-  ResolvedSkillView,
 } from '../types';
 
 const route = useRoute();
@@ -92,22 +92,6 @@ function skillPresetSourceLabel(row: ProjectSkillControlView): string {
   }
 
   return t('projectDetail.fromPreset', { names: row.viaPresets.join(', ') });
-}
-
-function resolvedLabels(row: ResolvedSkillView): string[] {
-  if (row.sources.length > 0) {
-    return row.sources.map((source) => source.label);
-  }
-
-  if (row.direct) {
-    return [t('facade.directLabel')];
-  }
-
-  if (row.viaPresets.length > 0) {
-    return row.viaPresets.map((presetName) => t('facade.viaPresetLabel', { name: presetName }));
-  }
-
-  return [t('common.viaPreset')];
 }
 
 async function loadProjectDetail(): Promise<void> {
@@ -239,8 +223,77 @@ onMounted(() => {
       <PageStatePanel v-if="actionMessage" tone="notice" tag="p">{{ actionMessage }}</PageStatePanel>
 
       <div class="project-detail-layout">
-        <section class="panel">
-          <div class="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
+        <section class="project-detail-section">
+          <div class="project-detail-section__intro">
+            <h3 class="section-heading">{{ t('projectDetail.presets') }}</h3>
+            <p class="mt-2 text-sm leading-6 text-muted">{{ t('projectDetail.presetsDescription') }}</p>
+          </div>
+
+          <div class="panel">
+            <div class="space-y-4">
+              <div>
+                <h4 class="subsection-heading">{{ t('common.enabled') }}</h4>
+                <ul v-if="detail.presetControls.enabled.length > 0" class="control-card-grid control-card-grid--dense mt-3">
+                  <li
+                    v-for="row in detail.presetControls.enabled"
+                    :key="`enabled-preset-${row.name}`"
+                  >
+                    <SwitchButtonCard :title="row.name" title-tag="h5" :muted="!row.editable">
+                      <template #switch>
+                        <SkillToggleSwitch
+                          :checked="row.enabled"
+                          :aria-label="`${row.name}: ${row.enabled ? t('common.disable') : t('common.enable')}`"
+                          :disabled="isPresetBusy(row.name) || !row.editable"
+                          :pending="isPresetBusy(row.name)"
+                          @toggle="togglePreset(row)"
+                        />
+                      </template>
+
+                      <template #body>
+                        <p class="project-detail-card-copy text-sm leading-6 text-muted" :title="presetMeta(row)">
+                          {{ presetMeta(row) }}
+                        </p>
+                      </template>
+                    </SwitchButtonCard>
+                  </li>
+                </ul>
+                <p v-else class="mt-2 text-sm text-muted">{{ t('projectDetail.noEnabledPresets') }}</p>
+              </div>
+
+              <div>
+                <h4 class="subsection-heading">{{ t('common.available') }}</h4>
+                <ul v-if="detail.presetControls.available.length > 0" class="control-card-grid control-card-grid--dense mt-3">
+                  <li
+                    v-for="row in detail.presetControls.available"
+                    :key="`available-preset-${row.name}`"
+                  >
+                    <SwitchButtonCard :title="row.name" title-tag="h5" :muted="!row.editable">
+                      <template #switch>
+                        <SkillToggleSwitch
+                          :checked="row.enabled"
+                          :aria-label="`${row.name}: ${row.enabled ? t('common.disable') : t('common.enable')}`"
+                          :disabled="isPresetBusy(row.name) || !row.editable"
+                          :pending="isPresetBusy(row.name)"
+                          @toggle="togglePreset(row)"
+                        />
+                      </template>
+
+                      <template #body>
+                        <p class="project-detail-card-copy text-sm leading-6 text-muted" :title="presetMeta(row)">
+                          {{ presetMeta(row) }}
+                        </p>
+                      </template>
+                    </SwitchButtonCard>
+                  </li>
+                </ul>
+                <p v-else class="mt-2 text-sm text-muted">{{ t('projectDetail.allPresetsEnabled') }}</p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="project-detail-section">
+          <div class="project-detail-section__intro project-detail-section__intro--with-tools">
             <div>
               <h3 class="section-heading">{{ t('projectDetail.skills') }}</h3>
               <p class="mt-2 text-sm leading-6 text-muted">{{ t('projectDetail.skillsDescription') }}</p>
@@ -251,151 +304,115 @@ onMounted(() => {
                 v-model="skillSearch"
                 :label="t('common.search')"
                 :placeholder="t('projectDetail.searchPlaceholder')"
+                :hide-label="true"
               />
             </div>
           </div>
 
-          <div class="mt-4 space-y-4">
-            <div>
-              <h4 class="subsection-heading">{{ t('common.enabled') }}</h4>
-              <ul v-if="filteredEnabledSkillRows.length > 0" class="skill-control-grid mt-3">
-                <li
-                  v-for="row in filteredEnabledSkillRows"
-                  :key="`enabled-skill-${row.name}`"
-                  class="skill-control-card"
-                  :class="{
-                    'skill-control-card--muted': !row.editable
-                  }"
-                >
-                  <SkillToggleSwitch
-                    v-if="!isPresetControlledSkill(row)"
-                    class="skill-switch"
-                    :checked="row.direct"
-                    :aria-label="`${row.name}: ${row.direct ? t('common.disable') : t('common.enable')}`"
-                    :disabled="isSkillBusy(row.name) || !row.editable"
-                    :pending="isSkillBusy(row.name)"
-                    @toggle="toggleSkill(row)"
-                  />
-                  <div class="skill-control-card__body">
-                    <div class="skill-control-card__header min-w-0">
-                      <h5 class="skill-control-card__title font-display text-2xl text-charcoal" :title="row.name">{{ row.name }}</h5>
-                    </div>
-                    <p
-                      class="skill-control-card__description mt-3 text-sm leading-6 text-muted"
-                      :title="row.description || row.path"
-                    >
-                      {{ row.description || row.path }}
-                    </p>
-                  </div>
-                  <button
-                    v-if="isPresetControlledSkill(row)"
-                    type="button"
-                    class="btn-secondary skill-control-card__button"
-                    :disabled="isSkillBusy(row.name) || !row.editable"
-                    @click="toggleSkill(row)"
+          <div class="panel">
+            <div class="space-y-4">
+              <div>
+                <h4 class="subsection-heading">{{ t('common.enabled') }}</h4>
+                <ul v-if="filteredEnabledSkillRows.length > 0" class="control-card-grid mt-3">
+                  <li
+                    v-for="row in filteredEnabledSkillRows"
+                    :key="`enabled-skill-${row.name}`"
                   >
-                    {{ skillPresetSourceLabel(row) }}
-                  </button>
-                </li>
-              </ul>
-              <p v-else class="mt-2 text-sm text-muted">{{ t('projectDetail.noEnabledSkillMatch') }}</p>
-            </div>
+                    <SwitchButtonCard :title="row.name" title-tag="h5" :muted="!row.editable">
+                      <template v-if="!isPresetControlledSkill(row)" #switch>
+                        <SkillToggleSwitch
+                          :checked="row.direct"
+                          :aria-label="`${row.name}: ${row.direct ? t('common.disable') : t('common.enable')}`"
+                          :disabled="isSkillBusy(row.name) || !row.editable"
+                          :pending="isSkillBusy(row.name)"
+                          @toggle="toggleSkill(row)"
+                        />
+                      </template>
 
-            <div>
-              <h4 class="subsection-heading">{{ t('common.available') }}</h4>
-              <ul v-if="filteredAvailableSkillRows.length > 0" class="skill-control-grid mt-3">
-                <li
-                  v-for="row in filteredAvailableSkillRows"
-                  :key="`available-skill-${row.name}`"
-                  class="skill-control-card"
-                  :class="{
-                    'skill-control-card--muted': !row.editable
-                  }"
-                >
-                  <SkillToggleSwitch
-                    v-if="!isPresetControlledSkill(row)"
-                    class="skill-switch"
-                    :checked="row.direct"
-                    :aria-label="`${row.name}: ${row.direct ? t('common.disable') : t('common.enable')}`"
-                    :disabled="isSkillBusy(row.name) || !row.editable"
-                    :pending="isSkillBusy(row.name)"
-                    @toggle="toggleSkill(row)"
-                  />
-                  <div class="skill-control-card__body">
-                    <div class="skill-control-card__header min-w-0">
-                      <h5 class="skill-control-card__title font-display text-2xl text-charcoal" :title="row.name">{{ row.name }}</h5>
-                    </div>
-                    <p
-                      class="skill-control-card__description mt-3 text-sm leading-6 text-muted"
-                      :title="row.description || row.path"
-                    >
-                      {{ row.description || row.path }}
-                    </p>
-                  </div>
-                  <button
-                    v-if="isPresetControlledSkill(row)"
-                    type="button"
-                    class="btn-secondary skill-control-card__button"
-                    :disabled="isSkillBusy(row.name)"
-                    @click="toggleSkill(row)"
+                      <template #body>
+                        <div v-if="isPresetControlledSkill(row)" class="project-detail-card-stack">
+                          <p
+                            class="project-detail-card-copy project-detail-card-copy--roomy text-sm leading-6 text-muted"
+                            :title="row.description || row.path"
+                          >
+                            {{ row.description || row.path }}
+                          </p>
+                          <button
+                            type="button"
+                            class="btn-secondary project-detail-card-button"
+                            :disabled="isSkillBusy(row.name) || !row.editable"
+                            @click="toggleSkill(row)"
+                          >
+                            {{ skillPresetSourceLabel(row) }}
+                          </button>
+                        </div>
+
+                        <p
+                          v-else
+                          class="project-detail-card-copy project-detail-card-copy--roomy text-sm leading-6 text-muted"
+                          :title="row.description || row.path"
+                        >
+                          {{ row.description || row.path }}
+                        </p>
+                      </template>
+                    </SwitchButtonCard>
+                  </li>
+                </ul>
+                <p v-else class="mt-2 text-sm text-muted">{{ t('projectDetail.noEnabledSkillMatch') }}</p>
+              </div>
+
+              <div>
+                <h4 class="subsection-heading">{{ t('common.available') }}</h4>
+                <ul v-if="filteredAvailableSkillRows.length > 0" class="control-card-grid mt-3">
+                  <li
+                    v-for="row in filteredAvailableSkillRows"
+                    :key="`available-skill-${row.name}`"
                   >
-                    {{ skillPresetSourceLabel(row) }}
-                  </button>
-                </li>
-              </ul>
-              <p v-else class="mt-2 text-sm text-muted">{{ t('projectDetail.noAvailableSkillMatch') }}</p>
+                    <SwitchButtonCard :title="row.name" title-tag="h5" :muted="!row.editable">
+                      <template v-if="!isPresetControlledSkill(row)" #switch>
+                        <SkillToggleSwitch
+                          :checked="row.direct"
+                          :aria-label="`${row.name}: ${row.direct ? t('common.disable') : t('common.enable')}`"
+                          :disabled="isSkillBusy(row.name) || !row.editable"
+                          :pending="isSkillBusy(row.name)"
+                          @toggle="toggleSkill(row)"
+                        />
+                      </template>
+
+                      <template #body>
+                        <div v-if="isPresetControlledSkill(row)" class="project-detail-card-stack">
+                          <p
+                            class="project-detail-card-copy project-detail-card-copy--roomy text-sm leading-6 text-muted"
+                            :title="row.description || row.path"
+                          >
+                            {{ row.description || row.path }}
+                          </p>
+                          <button
+                            type="button"
+                            class="btn-secondary project-detail-card-button"
+                            :disabled="isSkillBusy(row.name)"
+                            @click="toggleSkill(row)"
+                          >
+                            {{ skillPresetSourceLabel(row) }}
+                          </button>
+                        </div>
+
+                        <p
+                          v-else
+                          class="project-detail-card-copy project-detail-card-copy--roomy text-sm leading-6 text-muted"
+                          :title="row.description || row.path"
+                        >
+                          {{ row.description || row.path }}
+                        </p>
+                      </template>
+                    </SwitchButtonCard>
+                  </li>
+                </ul>
+                <p v-else class="mt-2 text-sm text-muted">{{ t('projectDetail.noAvailableSkillMatch') }}</p>
+              </div>
             </div>
           </div>
         </section>
-
-        <aside class="panel">
-          <h3 class="section-heading">{{ t('projectDetail.presets') }}</h3>
-          <p class="mt-2 text-sm leading-6 text-muted">{{ t('projectDetail.presetsDescription') }}</p>
-
-          <div class="mt-4 space-y-4">
-            <div>
-              <h4 class="subsection-heading">{{ t('common.enabled') }}</h4>
-              <ul v-if="detail.presetControls.enabled.length > 0" class="mt-2 space-y-2">
-                <li v-for="row in detail.presetControls.enabled" :key="`enabled-preset-${row.name}`" class="preset-control-row">
-                  <div class="min-w-0">
-                    <p class="truncate font-semibold text-charcoal">{{ row.name }}</p>
-                    <p class="mt-2 text-xs leading-5 text-muted">{{ presetMeta(row) }}</p>
-                  </div>
-                  <button
-                    type="button"
-                    class="btn-secondary preset-control-row__button"
-                    :disabled="isPresetBusy(row.name) || !row.editable"
-                    @click="togglePreset(row)"
-                  >
-                    {{ row.editable ? (isPresetBusy(row.name) ? t('common.updating') : t('common.disable')) : t('common.readonly') }}
-                  </button>
-                </li>
-              </ul>
-              <p v-else class="mt-2 text-sm text-muted">{{ t('projectDetail.noEnabledPresets') }}</p>
-            </div>
-
-            <div>
-              <h4 class="subsection-heading">{{ t('common.available') }}</h4>
-              <ul v-if="detail.presetControls.available.length > 0" class="mt-2 space-y-2">
-                <li v-for="row in detail.presetControls.available" :key="`available-preset-${row.name}`" class="preset-control-row">
-                  <div class="min-w-0">
-                    <p class="truncate font-semibold text-charcoal">{{ row.name }}</p>
-                    <p class="mt-2 text-xs leading-5 text-muted">{{ presetMeta(row) }}</p>
-                  </div>
-                  <button
-                    type="button"
-                    class="btn-secondary preset-control-row__button"
-                    :disabled="isPresetBusy(row.name) || !row.editable"
-                    @click="togglePreset(row)"
-                  >
-                    {{ row.editable ? (isPresetBusy(row.name) ? t('common.updating') : t('common.enable')) : t('common.readonly') }}
-                  </button>
-                </li>
-              </ul>
-              <p v-else class="mt-2 text-sm text-muted">{{ t('projectDetail.allPresetsEnabled') }}</p>
-            </div>
-          </div>
-        </aside>
       </div>
     </template>
   </section>
@@ -407,72 +424,24 @@ onMounted(() => {
   gap: 1rem;
 }
 
-.preset-control-row {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 0.75rem;
-  border: 0;
-  border-radius: 0.75rem;
-  background: #f5f5f5;
-  padding: 0.9rem 1rem;
-  box-shadow:
-    rgba(19, 19, 22, 0.7) 0px 1px 5px -4px,
-    rgba(34, 42, 53, 0.08) 0px 0px 0px 1px;
-}
-
-.preset-control-row__button {
-  white-space: nowrap;
-}
-
-.skill-control-grid {
+.project-detail-section {
   display: grid;
   gap: 0.75rem;
 }
 
-.skill-control-card {
-  position: relative;
+.project-detail-section__intro--with-tools {
   display: flex;
-  min-height: 100%;
   flex-direction: column;
-  justify-content: space-between;
-  gap: 1.25rem;
-  border-radius: 1rem;
-  background: #ffffff;
-  padding: 1.5rem;
-  box-shadow:
-    rgba(19, 19, 22, 0.7) 0px 1px 5px -4px,
-    rgba(34, 42, 53, 0.08) 0px 0px 0px 1px;
+  gap: 0.75rem;
 }
 
-.skill-control-card--muted {
-  background: #f5f5f5;
+.control-card-grid {
+  display: grid;
+  gap: 0.75rem;
 }
 
-.skill-control-card__body {
-  display: flex;
-  min-height: 0;
-  flex: 1;
-  flex-direction: column;
-}
-
-.skill-control-card__header {
-  min-width: 0;
-}
-
-.skill-control-card__title {
+.project-detail-card-copy {
   display: -webkit-box;
-  min-width: 0;
-  max-width: calc(100% - 4rem);
-  overflow: hidden;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
-  line-height: 1.12;
-}
-
-.skill-control-card__description {
-  display: -webkit-box;
-  min-height: calc(1.5rem * 4);
   overflow: hidden;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 4;
@@ -480,60 +449,61 @@ onMounted(() => {
   word-break: break-word;
 }
 
-.skill-control-card__button {
+.project-detail-card-copy--roomy {
+  min-height: calc(1.5rem * 4);
+}
+
+.project-detail-card-stack {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 1.25rem;
+}
+
+.project-detail-card-button {
   width: 100%;
   min-height: 2.75rem;
 }
 
-.skill-switch {
-  position: absolute;
-  top: 1rem;
-  right: 1rem;
-  z-index: 1;
-}
-
-.resolved-row {
-  border-radius: 0.75rem;
-  background: #f5f5f5;
-  padding: 1rem;
-  box-shadow:
-    rgba(19, 19, 22, 0.7) 0px 1px 5px -4px,
-    rgba(34, 42, 53, 0.08) 0px 0px 0px 1px;
-}
-
 @media (min-width: 640px) {
-  .skill-control-grid {
+  .project-detail-section {
+    gap: 1rem;
+  }
+
+  .control-card-grid {
     grid-template-columns: repeat(1, minmax(0, 1fr));
   }
-}
 
-@media (min-width: 1024px) {
-  .skill-control-grid {
+  .control-card-grid--dense {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
 @media (min-width: 1024px) {
-  .project-detail-layout {
-    grid-template-columns: minmax(0, 3fr) minmax(0, 1fr);
-    align-items: start;
+  .project-detail-section__intro--with-tools {
+    align-items: flex-end;
+    flex-direction: row;
+    justify-content: space-between;
+  }
+
+  .control-card-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .control-card-grid--dense {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 }
 
 @media (min-width: 1536px) {
-  .skill-control-grid {
+  .control-card-grid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
-}
 
-@media (max-width: 1439px) {
-  .preset-control-row {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .preset-control-row__button {
-    width: 100%;
-    margin-top: 0.25rem;
+  .control-card-grid--dense {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
   }
 }
 </style>

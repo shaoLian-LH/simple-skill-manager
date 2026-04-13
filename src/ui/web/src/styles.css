@@ -57,7 +57,7 @@ a {
 }
 
 .app-layout {
-  @apply mx-auto grid h-full min-h-0 w-full max-w-workbench gap-5 overflow-hidden px-4 pb-4 pt-20 xl:grid-cols-[280px_minmax(0,1fr)] xl:gap-0 xl:px-6 xl:pb-6 xl:pt-0;
+  @apply mx-auto grid h-full min-h-0 w-full max-w-workbench gap-5 overflow-hidden px-4 pb-4 pt-20;
 }
 
 .workbench-shell {
@@ -635,13 +635,16 @@ a {
   }
 }
 
-@media (min-width: 1180px) {
-  .skills-grid {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-  }
-}
-
 @media (min-width: 1280px) {
+  .app-layout {
+    gap: 0;
+    padding-top: 0;
+    padding-right: 1.5rem;
+    padding-bottom: 1.5rem;
+    padding-left: 1.5rem;
+    grid-template-columns: 280px minmax(0, 1fr);
+  }
+
   .mobile-nav-trigger,
   .nav-drawer-overlay,
   .nav-drawer {

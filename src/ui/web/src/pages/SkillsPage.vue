@@ -4,6 +4,7 @@ import { computed, onMounted, ref } from 'vue';
 import PageSearchBar from '../components/PageSearchBar.vue';
 import PageStatePanel from '../components/PageStatePanel.vue';
 import SkillToggleSwitch from '../components/SkillToggleSwitch.vue';
+import SwitchButtonCard from '../components/SwitchButtonCard.vue';
 import { apiRequest } from '../lib/api';
 import { useSetQuickActions, useWorkspaceSpine } from '../lib/chrome';
 import { asBoolean, asRecord, asString, asStringArray } from '../lib/coerce';
@@ -359,52 +360,54 @@ onMounted(() => {
     <ul v-if="!loading && !loadError && cards.length > 0 && filteredCards.length > 0" class="skills-grid">
       <li v-for="card in filteredCards" :key="card.key" class="skill-card-shell">
         <div class="skill-card-inner" :class="{ flipped: isFlipped(card.key) }">
-          <article
-            class="skill-face skill-face-front panel skill-face-clickable"
+          <SwitchButtonCard
+            :title="card.name"
+            class="skill-face skill-face-front skill-face-clickable"
             role="button"
             tabindex="0"
             @click="toggleCard(card.key)"
             @keydown="onCardKeydown($event, card.key)"
           >
-            <SkillToggleSwitch
-              class="skill-switch"
-              :checked="card.globalEnabled"
-              :aria-label="`${card.name}: ${card.globalEnabled ? t('common.disable') : t('common.enable')}`"
-              :disabled="isCardPending(card.key)"
-              :pending="isCardPending(card.key)"
-              @toggle="toggleSkill(card)"
-            />
+            <template #switch>
+              <SkillToggleSwitch
+                :checked="card.globalEnabled"
+                :aria-label="`${card.name}: ${card.globalEnabled ? t('common.disable') : t('common.enable')}`"
+                :disabled="isCardPending(card.key)"
+                :pending="isCardPending(card.key)"
+                @toggle="toggleSkill(card)"
+              />
+            </template>
 
-            <h4 class="font-display text-2xl text-charcoal skill-card-title" :title="card.name">{{ card.name }}</h4>
+            <template #body>
+              <p class="text-sm leading-6 text-muted skills-description-clamp" :title="card.description">{{ card.description }}</p>
 
-            <p class="mt-3 text-sm leading-6 text-muted skills-description-clamp" :title="card.description">{{ card.description }}</p>
-
-            <dl class="mt-4 grid gap-3 md:grid-cols-2">
-              <div class="min-w-0">
-                <dt class="detail-term">{{ t('skills.location') }}</dt>
-                <dd class="mt-1">
-                  <button
-                    type="button"
-                    class="skill-location-button"
-                    :data-open-path="card.openPath"
-                    :data-location-kind="card.locationKind"
-                    :title="card.fullPath"
-                    :disabled="isLocationPending(card.key)"
-                    @keydown.stop
-                    @click.stop="openSkillLocation(card)"
-                  >
-                    <span class="skill-location-button__text">
-                      {{ isLocationPending(card.key) ? t('common.opening') : card.displayPath }}
-                    </span>
-                  </button>
-                </dd>
-              </div>
-              <div>
-                <dt class="detail-term">{{ t('skills.updated') }}</dt>
-                <dd class="mt-2 text-sm text-muted">{{ formatDateTime(card.updatedAt) }}</dd>
-              </div>
-            </dl>
-          </article>
+              <dl class="grid gap-3 md:grid-cols-2">
+                <div class="min-w-0">
+                  <dt class="detail-term">{{ t('skills.location') }}</dt>
+                  <dd class="mt-1">
+                    <button
+                      type="button"
+                      class="skill-location-button"
+                      :data-open-path="card.openPath"
+                      :data-location-kind="card.locationKind"
+                      :title="card.fullPath"
+                      :disabled="isLocationPending(card.key)"
+                      @keydown.stop
+                      @click.stop="openSkillLocation(card)"
+                    >
+                      <span class="skill-location-button__text">
+                        {{ isLocationPending(card.key) ? t('common.opening') : card.displayPath }}
+                      </span>
+                    </button>
+                  </dd>
+                </div>
+                <div>
+                  <dt class="detail-term">{{ t('skills.updated') }}</dt>
+                  <dd class="mt-2 text-sm text-muted">{{ formatDateTime(card.updatedAt) }}</dd>
+                </div>
+              </dl>
+            </template>
+          </SwitchButtonCard>
 
           <article
             class="skill-face skill-face-back panel skill-face-clickable"
@@ -514,26 +517,12 @@ onMounted(() => {
     0 0 0 4px rgba(59, 130, 246, 0.16);
 }
 
-.skill-face-front {
-  position: relative;
-  padding-top: 2.5rem;
-}
-
 .skill-face-back {
   position: absolute;
   inset: 0;
   transform: rotateY(180deg);
   overflow: hidden;
   gap: 1rem;
-}
-
-.skill-card-title {
-  display: -webkit-box;
-  min-width: 0;
-  overflow: hidden;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
-  line-height: 1.12;
 }
 
 .skill-location-button {
@@ -648,13 +637,6 @@ onMounted(() => {
 .skill-related-project-button:disabled {
   cursor: wait;
   opacity: 0.72;
-}
-
-.skill-switch {
-  position: absolute;
-  top: 1rem;
-  right: 1rem;
-  z-index: 1;
 }
 
 @media (max-width: 767px), (prefers-reduced-motion: reduce) {
