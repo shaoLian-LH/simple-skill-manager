@@ -33,7 +33,8 @@ node dist/skm.js --help
 
 打包后的 CLI 通过 `package.json#bin` 暴露为 `skm`。
 
-前端页面开发请使用 `pnpm run dev:web`。如果要通过 CLI 集成的 `skm ui` 提供页面，请先执行 `pnpm run build:web` 或 `pnpm run build`，把 Web UI 产物生成到 `dist/ui/web`。
+前端页面开发请使用 `pnpm run dev:web`。如果要通过 CLI 集成的 `skm ui` 提供页面，请先执行 `pnpm run build:web` 或 `pnpm run build`，把 Web UI 产物生成到当前包内的 `dist/ui/web`。
+当 `skm ui` 通过全局 link 或全局安装后的 CLI 启动时，它会优先读取该安装包自身携带的 `dist/ui/web`，而不是当前工作目录下的 `dist/ui/web`。
 
 ### 开发期间链接为全局 CLI
 

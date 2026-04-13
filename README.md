@@ -33,7 +33,8 @@ node dist/skm.js --help
 
 The packaged CLI is exposed as `skm` through `package.json#bin`.
 
-For Web UI development, use `pnpm run dev:web`. For CLI-integrated UI serving, build the UI assets into `dist/ui/web` first with `pnpm run build:web` or `pnpm run build`.
+For Web UI development, use `pnpm run dev:web`. For CLI-integrated UI serving, build the UI assets into the package-local `dist/ui/web` first with `pnpm run build:web` or `pnpm run build`.
+When `skm ui` is launched from a globally linked or installed CLI, it serves the bundled assets from that installed package instead of looking for `dist/ui/web` in your current working directory.
 
 ### Link as a global CLI during development
 
