@@ -133,7 +133,6 @@ const MESSAGES: Record<UiLocale, UiTextValue> = {
       globalOverview: '全局概览',
       recentProjects: '最近项目',
       noTrackedProjects: '当前还没有已跟踪项目。',
-      skillPresetSummary: '{{skillCount}} 个技能 / {{presetCount}} 个技能集',
       updatedAt: '{{value}}',
     },
     projects: {
@@ -537,7 +536,6 @@ const MESSAGES: Record<UiLocale, UiTextValue> = {
       globalOverview: 'Global Overview',
       recentProjects: 'Recent Projects',
       noTrackedProjects: 'No tracked projects available yet.',
-      skillPresetSummary: '{{skillCount}} skills / {{presetCount}} presets',
       updatedAt: '{{value}}',
     },
     projects: {

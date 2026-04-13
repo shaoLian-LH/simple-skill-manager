@@ -246,6 +246,72 @@ onMounted(() => {
 
     <template v-else-if="model">
       <section class="space-y-3">
+        <h3 class="section-heading">{{ t('overview.globalOverview') }}</h3>
+        <div class="mt-3 grid gap-3 md:grid-cols-3">
+          <article class="metric-card overview-metric-card">
+            <p class="metric-label">{{ t('nav.projects') }}</p>
+            <p class="metric-value">{{ model.totals.projects }}</p>
+          </article>
+          <article class="metric-card overview-metric-card">
+            <p class="metric-label">{{ t('nav.presets') }}</p>
+            <p class="metric-value">{{ model.totals.presets }}</p>
+          </article>
+          <article class="metric-card overview-metric-card">
+            <p class="metric-label">{{ t('nav.skills') }}</p>
+            <p class="metric-value">{{ model.totals.skills }}</p>
+          </article>
+        </div>
+      </section>
+
+      <section class="space-y-3">
+        <div class="flex items-center justify-between">
+          <h3 class="section-heading">{{ t('overview.recentProjects') }}</h3>
+          <button type="button" class="btn-ghost" @click="openAction('/projects')">{{ t('common.viewAll') }}</button>
+        </div>
+        <ul v-if="model.recentProjects.length > 0" class="recent-project-grid">
+          <li
+            v-for="project in model.recentProjects.slice(0, 6)"
+            :key="project.projectId"
+            class="recent-project-card"
+            role="button"
+            tabindex="0"
+            @click="openProject(project.projectId)"
+            @keydown="onProjectCardKeydown($event, project.projectId)"
+          >
+            <div class="recent-project-card__body">
+              <div class="recent-project-card__header min-w-0">
+                <h4 class="recent-project-card__title font-display text-2xl text-charcoal" :title="getProjectLabel(project.projectPath)">
+                  {{ getProjectLabel(project.projectPath) }}
+                </h4>
+                <p class="recent-project-card__path mt-3 text-sm leading-6 text-muted" :title="project.projectPath">
+                  {{ project.projectPath }}
+                </p>
+              </div>
+            </div>
+            <div class="recent-project-card__footer">
+              <div class="recent-project-card__summary">
+                <div class="recent-project-card__summary-item">
+                  <p class="detail-term">{{ t('nav.skills') }}</p>
+                  <p class="recent-project-card__summary-value">{{ project.enabledSkillCount }}</p>
+                </div>
+                <div class="recent-project-card__summary-item">
+                  <p class="detail-term">{{ t('nav.presets') }}</p>
+                  <p class="recent-project-card__summary-value">{{ project.enabledPresetCount }}</p>
+                </div>
+              </div>
+              <div class="recent-project-card__footer-meta">
+                <p class="detail-term">{{ t('skills.updated') }}</p>
+                <p class="recent-project-card__footer-value text-sm text-muted">{{ formatDateTime(project.updatedAt) }}</p>
+              </div>
+            </div>
+          </li>
+        </ul>
+        <p v-else class="rounded-card bg-subtle p-4 text-sm text-muted shadow-card">
+          {{ t('overview.noTrackedProjects') }}
+        </p>
+      </section>
+
+      <section class="space-y-3">
         <h3 class="section-heading">{{ t('overview.recommendedActions') }}</h3>
         <ul class="overview-action-grid">
           <li v-for="action in model.recommendedActions.slice(0, 3)" :key="action.id" class="overview-action-card">
@@ -261,88 +327,55 @@ onMounted(() => {
           </li>
         </ul>
       </section>
-
-      <section class="panel">
-        <h3 class="section-heading">{{ t('overview.globalOverview') }}</h3>
-        <div class="mt-3 grid gap-3 md:grid-cols-3">
-          <article class="metric-card">
-            <p class="metric-label">{{ t('nav.projects') }}</p>
-            <p class="metric-value">{{ model.totals.projects }}</p>
-          </article>
-          <article class="metric-card">
-            <p class="metric-label">{{ t('nav.presets') }}</p>
-            <p class="metric-value">{{ model.totals.presets }}</p>
-          </article>
-          <article class="metric-card">
-            <p class="metric-label">{{ t('nav.skills') }}</p>
-            <p class="metric-value">{{ model.totals.skills }}</p>
-          </article>
-        </div>
-      </section>
-
-      <section class="panel">
-        <div class="flex items-center justify-between">
-          <h3 class="section-heading">{{ t('overview.recentProjects') }}</h3>
-          <button type="button" class="btn-ghost" @click="openAction('/projects')">{{ t('common.viewAll') }}</button>
-        </div>
-        <ul v-if="model.recentProjects.length > 0" class="recent-project-grid mt-4">
-          <li
-            v-for="project in model.recentProjects.slice(0, 6)"
-            :key="project.projectId"
-            class="recent-project-card panel"
-            role="button"
-            tabindex="0"
-            @click="openProject(project.projectId)"
-            @keydown="onProjectCardKeydown($event, project.projectId)"
-          >
-            <div class="recent-project-card__body">
-              <div class="recent-project-card__header min-w-0">
-                <h4 class="recent-project-card__title font-display text-2xl text-charcoal" :title="getProjectLabel(project.projectPath)">
-                  {{ getProjectLabel(project.projectPath) }}
-                </h4>
-                <p class="recent-project-card__path mt-3 text-sm leading-6 text-muted" :title="project.projectPath">
-                  {{ project.projectPath }}
-                </p>
-              </div>
-              <p class="recent-project-card__summary mt-4 text-sm leading-6 text-muted">
-                {{
-                  t('overview.skillPresetSummary', {
-                    skillCount: project.enabledSkillCount,
-                    presetCount: project.enabledPresetCount,
-                  })
-                }}
-              </p>
-            </div>
-            <div class="recent-project-card__footer">
-              <div class="recent-project-card__footer-meta min-w-0">
-                <p class="detail-term">{{ t('skills.updated') }}</p>
-                <p class="mt-2 text-sm text-muted">{{ formatDateTime(project.updatedAt) }}</p>
-              </div>
-            </div>
-          </li>
-        </ul>
-        <p v-else class="mt-2 rounded-card bg-subtle p-4 text-sm text-muted shadow-card">
-          {{ t('overview.noTrackedProjects') }}
-        </p>
-      </section>
     </template>
   </section>
 </template>
 
 <style scoped>
+.overview-metric-card {
+  background: #ffffff;
+  box-shadow:
+    rgba(19, 19, 22, 0.7) 0px 1px 5px -4px,
+    rgba(34, 42, 53, 0.08) 0px 0px 0px 1px,
+    rgba(34, 42, 53, 0.05) 0px 4px 8px 0px;
+}
+
 .recent-project-grid {
   display: grid;
   gap: 1rem;
 }
 
 .recent-project-card {
+  border-radius: 1.25rem;
+  background: #ffffff;
+  box-shadow:
+    rgba(19, 19, 22, 0.72) 0px 1px 6px -4px,
+    rgba(34, 42, 53, 0.08) 0px 0px 0px 1px,
+    rgba(34, 42, 53, 0.08) 0px 18px 36px -18px;
   display: flex;
   min-height: 100%;
   flex-direction: column;
   justify-content: space-between;
   gap: 1.25rem;
-  padding-top: 1.5rem;
+  padding: 1.5rem;
   cursor: pointer;
+  transition:
+    transform 160ms ease,
+    box-shadow 160ms ease,
+    background-color 160ms ease;
+}
+
+.recent-project-card:hover {
+  background: #ffffff;
+  box-shadow:
+    rgba(19, 19, 22, 0.7) 0px 1px 5px -4px,
+    rgba(34, 42, 53, 0.1) 0px 0px 0px 1px,
+    rgba(34, 42, 53, 0.1) 0px 20px 40px -20px;
+  transform: translateY(-2px);
+}
+
+.recent-project-card:active {
+  transform: translateY(-1px);
 }
 
 .recent-project-card:focus-visible {
@@ -357,6 +390,7 @@ onMounted(() => {
   min-height: 0;
   flex: 1;
   flex-direction: column;
+  gap: 1rem;
 }
 
 .recent-project-card__header {
@@ -375,11 +409,14 @@ onMounted(() => {
 .recent-project-card__footer {
   display: flex;
   align-items: flex-end;
-  gap: 0.75rem;
+  justify-content: space-between;
+  gap: 1rem;
 }
 
 .recent-project-card__footer-meta {
   min-width: 0;
+  flex-shrink: 0;
+  text-align: right;
 }
 
 .recent-project-card__path {
@@ -393,17 +430,58 @@ onMounted(() => {
 }
 
 .recent-project-card__summary {
-  display: -webkit-box;
-  min-height: calc(1.5rem * 2);
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  min-width: 0;
+  flex: 1;
+  gap: 0.75rem;
+}
+
+.recent-project-card__summary-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.recent-project-card__summary-value {
+  font-family:
+    "Avenir Next",
+    "Inter",
+    "Segoe UI",
+    ui-sans-serif,
+    system-ui,
+    sans-serif;
+  font-size: 1.125rem;
+  font-weight: 600;
+  line-height: 1.2;
+  color: #242424;
+}
+
+.recent-project-card__footer-value {
+  margin-top: 0.5rem;
   overflow: hidden;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
+  text-overflow: ellipsis;
 }
 
 @media (max-width: 639px) {
   .recent-project-card__footer {
-    align-items: stretch;
+    align-items: flex-start;
     flex-direction: column;
+  }
+
+  .recent-project-card__footer-meta {
+    text-align: left;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .recent-project-card {
+    transition: box-shadow 160ms ease;
+  }
+
+  .recent-project-card:hover,
+  .recent-project-card:active {
+    transform: none;
   }
 }
 
@@ -416,24 +494,6 @@ onMounted(() => {
 @media (min-width: 768px) {
   .recent-project-grid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-}
-
-@media (min-width: 1024px) {
-  .recent-project-grid {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-  }
-}
-
-@media (min-width: 1280px) {
-  .recent-project-grid {
-    grid-template-columns: repeat(5, minmax(0, 1fr));
-  }
-}
-
-@media (min-width: 1536px) {
-  .recent-project-grid {
-    grid-template-columns: repeat(6, minmax(0, 1fr));
   }
 }
 </style>
