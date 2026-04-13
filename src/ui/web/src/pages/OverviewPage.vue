@@ -219,6 +219,15 @@ function openProject(projectId: string): void {
   void pushPath(`/projects/${encodeURIComponent(projectId)}`);
 }
 
+function onProjectCardKeydown(event: KeyboardEvent, currentProjectId: string): void {
+  if (event.key !== 'Enter' && event.key !== ' ') {
+    return;
+  }
+
+  event.preventDefault();
+  openProject(currentProjectId);
+}
+
 onMounted(() => {
   void loadOverview();
 });
@@ -280,32 +289,34 @@ onMounted(() => {
           <li
             v-for="project in model.recentProjects.slice(0, 6)"
             :key="project.projectId"
-            class="recent-project-card rounded-card bg-subtle p-4 shadow-card"
+            class="recent-project-card panel"
+            role="button"
+            tabindex="0"
+            @click="openProject(project.projectId)"
+            @keydown="onProjectCardKeydown($event, project.projectId)"
           >
             <div class="recent-project-card__body">
-              <div class="min-w-0">
-                <p class="font-semibold text-charcoal">{{ getProjectLabel(project.projectPath) }}</p>
-                <p class="recent-project-card__path mt-2 text-xs leading-5 text-muted" :title="project.projectPath">
+              <div class="recent-project-card__header min-w-0">
+                <h4 class="recent-project-card__title font-display text-2xl text-charcoal" :title="getProjectLabel(project.projectPath)">
+                  {{ getProjectLabel(project.projectPath) }}
+                </h4>
+                <p class="recent-project-card__path mt-3 text-sm leading-6 text-muted" :title="project.projectPath">
                   {{ project.projectPath }}
                 </p>
-                <p class="mt-2 text-xs leading-5 text-muted">
-                  {{
-                    t('overview.skillPresetSummary', {
-                      skillCount: project.enabledSkillCount,
-                      presetCount: project.enabledPresetCount,
-                    })
-                  }}
-                </p>
               </div>
+              <p class="recent-project-card__summary mt-4 text-sm leading-6 text-muted">
+                {{
+                  t('overview.skillPresetSummary', {
+                    skillCount: project.enabledSkillCount,
+                    presetCount: project.enabledPresetCount,
+                  })
+                }}
+              </p>
             </div>
             <div class="recent-project-card__footer">
-              <div class="min-w-0">
-                <p class="text-xs text-muted">{{ formatDateTime(project.updatedAt) }}</p>
-              </div>
-              <div class="recent-project-card__actions text-right">
-                <button type="button" class="btn-ghost mt-2" @click="openProject(project.projectId)">
-                  {{ t('common.open') }}
-                </button>
+              <div class="recent-project-card__footer-meta min-w-0">
+                <p class="detail-term">{{ t('skills.updated') }}</p>
+                <p class="mt-2 text-sm text-muted">{{ formatDateTime(project.updatedAt) }}</p>
               </div>
             </div>
           </li>
@@ -329,22 +340,51 @@ onMounted(() => {
   min-height: 100%;
   flex-direction: column;
   justify-content: space-between;
-  gap: 1rem;
+  gap: 1.25rem;
+  padding-top: 1.5rem;
+  cursor: pointer;
+}
+
+.recent-project-card:focus-visible {
+  box-shadow:
+    rgba(19, 19, 22, 0.7) 0px 1px 5px -4px,
+    rgba(34, 42, 53, 0.08) 0px 0px 0px 1px,
+    0 0 0 4px rgba(59, 130, 246, 0.16);
 }
 
 .recent-project-card__body {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+}
+
+.recent-project-card__header {
   min-width: 0;
+}
+
+.recent-project-card__title {
+  display: -webkit-box;
+  min-width: 0;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-height: 1.12;
 }
 
 .recent-project-card__footer {
   display: flex;
   align-items: flex-end;
-  justify-content: space-between;
   gap: 0.75rem;
+}
+
+.recent-project-card__footer-meta {
+  min-width: 0;
 }
 
 .recent-project-card__path {
   display: -webkit-box;
+  min-height: calc(1.5rem * 3);
   overflow: hidden;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 3;
@@ -352,8 +392,19 @@ onMounted(() => {
   word-break: break-word;
 }
 
-.recent-project-card__actions {
-  flex-shrink: 0;
+.recent-project-card__summary {
+  display: -webkit-box;
+  min-height: calc(1.5rem * 2);
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+@media (max-width: 639px) {
+  .recent-project-card__footer {
+    align-items: stretch;
+    flex-direction: column;
+  }
 }
 
 @media (min-width: 640px) {

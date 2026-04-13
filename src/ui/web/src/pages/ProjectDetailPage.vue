@@ -4,6 +4,7 @@ import { useRoute } from 'vue-router';
 
 import PageSearchBar from '../components/PageSearchBar.vue';
 import PageStatePanel from '../components/PageStatePanel.vue';
+import SkillToggleSwitch from '../components/SkillToggleSwitch.vue';
 import { apiRequest } from '../lib/api';
 import { useSetQuickActions, useSetWorkspaceContext } from '../lib/chrome';
 import { useUiI18n } from '../lib/i18n';
@@ -81,20 +82,16 @@ function presetMeta(row: ProjectPresetControlView): string {
   return row.reason ? `${base} · ${row.reason}` : base;
 }
 
-function skillMeta(row: ProjectSkillControlView): string {
-  if (row.reason) {
-    return row.reason;
+function isPresetControlledSkill(row: ProjectSkillControlView): boolean {
+  return !row.direct && row.viaPresets.length > 0;
+}
+
+function skillPresetSourceLabel(row: ProjectSkillControlView): string {
+  if (row.viaPresets.length === 0) {
+    return '';
   }
 
-  if (row.direct) {
-    return t('facade.directLabel');
-  }
-
-  if (row.viaPresets.length > 0) {
-    return t('facade.viaPresetLabel', { name: row.viaPresets.join(', ') });
-  }
-
-  return t('common.disabled');
+  return t('projectDetail.fromPreset', { names: row.viaPresets.join(', ') });
 }
 
 function resolvedLabels(row: ResolvedSkillView): string[] {
@@ -262,32 +259,42 @@ onMounted(() => {
             <div>
               <h4 class="subsection-heading">{{ t('common.enabled') }}</h4>
               <ul v-if="filteredEnabledSkillRows.length > 0" class="skill-control-grid mt-3">
-                <li v-for="row in filteredEnabledSkillRows" :key="`enabled-skill-${row.name}`" class="skill-control-card">
-                  <div class="min-w-0">
-                    <p class="skill-control-card__title font-semibold text-charcoal" :title="row.name">{{ row.name }}</p>
+                <li
+                  v-for="row in filteredEnabledSkillRows"
+                  :key="`enabled-skill-${row.name}`"
+                  class="skill-control-card"
+                  :class="{
+                    'skill-control-card--muted': !row.editable
+                  }"
+                >
+                  <SkillToggleSwitch
+                    v-if="!isPresetControlledSkill(row)"
+                    class="skill-switch"
+                    :checked="row.direct"
+                    :aria-label="`${row.name}: ${row.direct ? t('common.disable') : t('common.enable')}`"
+                    :disabled="isSkillBusy(row.name) || !row.editable"
+                    :pending="isSkillBusy(row.name)"
+                    @toggle="toggleSkill(row)"
+                  />
+                  <div class="skill-control-card__body">
+                    <div class="skill-control-card__header min-w-0">
+                      <h5 class="skill-control-card__title font-display text-2xl text-charcoal" :title="row.name">{{ row.name }}</h5>
+                    </div>
                     <p
-                      class="skill-control-card__description mt-3 text-xs leading-5 text-muted"
+                      class="skill-control-card__description mt-3 text-sm leading-6 text-muted"
                       :title="row.description || row.path"
                     >
                       {{ row.description || row.path }}
                     </p>
-                    <p class="skill-control-card__meta mt-3 text-xs text-muted">
-                      {{ skillMeta(row) }}
-                    </p>
                   </div>
                   <button
+                    v-if="isPresetControlledSkill(row)"
                     type="button"
                     class="btn-secondary skill-control-card__button"
                     :disabled="isSkillBusy(row.name) || !row.editable"
                     @click="toggleSkill(row)"
                   >
-                    {{
-                      row.editable
-                        ? isSkillBusy(row.name)
-                          ? t('common.updating')
-                          : t('common.disable')
-                        : t('common.viaPreset')
-                    }}
+                    {{ skillPresetSourceLabel(row) }}
                   </button>
                 </li>
               </ul>
@@ -297,26 +304,42 @@ onMounted(() => {
             <div>
               <h4 class="subsection-heading">{{ t('common.available') }}</h4>
               <ul v-if="filteredAvailableSkillRows.length > 0" class="skill-control-grid mt-3">
-                <li v-for="row in filteredAvailableSkillRows" :key="`available-skill-${row.name}`" class="skill-control-card">
-                  <div class="min-w-0">
-                    <p class="skill-control-card__title font-semibold text-charcoal" :title="row.name">{{ row.name }}</p>
+                <li
+                  v-for="row in filteredAvailableSkillRows"
+                  :key="`available-skill-${row.name}`"
+                  class="skill-control-card"
+                  :class="{
+                    'skill-control-card--muted': !row.editable
+                  }"
+                >
+                  <SkillToggleSwitch
+                    v-if="!isPresetControlledSkill(row)"
+                    class="skill-switch"
+                    :checked="row.direct"
+                    :aria-label="`${row.name}: ${row.direct ? t('common.disable') : t('common.enable')}`"
+                    :disabled="isSkillBusy(row.name) || !row.editable"
+                    :pending="isSkillBusy(row.name)"
+                    @toggle="toggleSkill(row)"
+                  />
+                  <div class="skill-control-card__body">
+                    <div class="skill-control-card__header min-w-0">
+                      <h5 class="skill-control-card__title font-display text-2xl text-charcoal" :title="row.name">{{ row.name }}</h5>
+                    </div>
                     <p
-                      class="skill-control-card__description mt-3 text-xs leading-5 text-muted"
+                      class="skill-control-card__description mt-3 text-sm leading-6 text-muted"
                       :title="row.description || row.path"
                     >
                       {{ row.description || row.path }}
                     </p>
-                    <p class="skill-control-card__meta mt-3 text-xs text-muted">
-                      {{ row.reason || t('common.disabled') }}
-                    </p>
                   </div>
                   <button
+                    v-if="isPresetControlledSkill(row)"
                     type="button"
                     class="btn-secondary skill-control-card__button"
                     :disabled="isSkillBusy(row.name)"
                     @click="toggleSkill(row)"
                   >
-                    {{ isSkillBusy(row.name) ? t('common.updating') : t('common.enable') }}
+                    {{ skillPresetSourceLabel(row) }}
                   </button>
                 </li>
               </ul>
@@ -374,27 +397,6 @@ onMounted(() => {
           </div>
         </aside>
       </div>
-
-      <aside class="panel">
-        <h3 class="section-heading">{{ t('projectDetail.resolvedOutcome') }}</h3>
-        <p class="mt-2 text-sm leading-6 text-muted">{{ t('projectDetail.resolvedDescription') }}</p>
-
-        <ul v-if="detail.resolvedSkills.length > 0" class="mt-4 space-y-2">
-          <li v-for="row in detail.resolvedSkills" :key="`resolved-${row.name}`" class="resolved-row">
-            <p class="font-semibold text-charcoal">{{ row.name }}</p>
-            <div class="mt-2 flex flex-wrap gap-2">
-              <span
-                v-for="label in resolvedLabels(row)"
-                :key="`${row.name}-${label}`"
-                class="chip"
-              >
-                {{ label }}
-              </span>
-            </div>
-          </li>
-        </ul>
-        <p v-else class="mt-4 text-sm text-muted">{{ t('projectDetail.noResolvedSkills') }}</p>
-      </aside>
     </template>
   </section>
 </template>
@@ -429,46 +431,65 @@ onMounted(() => {
 }
 
 .skill-control-card {
+  position: relative;
   display: flex;
   min-height: 100%;
   flex-direction: column;
   justify-content: space-between;
-  gap: 1rem;
-  border-radius: 0.75rem;
-  background: #f5f5f5;
-  padding: 1rem;
+  gap: 1.25rem;
+  border-radius: 1rem;
+  background: #ffffff;
+  padding: 1.5rem;
   box-shadow:
     rgba(19, 19, 22, 0.7) 0px 1px 5px -4px,
     rgba(34, 42, 53, 0.08) 0px 0px 0px 1px;
 }
 
+.skill-control-card--muted {
+  background: #f5f5f5;
+}
+
+.skill-control-card__body {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+}
+
+.skill-control-card__header {
+  min-width: 0;
+}
+
 .skill-control-card__title {
   display: -webkit-box;
+  min-width: 0;
+  max-width: calc(100% - 4rem);
   overflow: hidden;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
+  line-height: 1.12;
 }
 
 .skill-control-card__description {
   display: -webkit-box;
-  min-height: calc(1.25rem * 6);
+  min-height: calc(1.5rem * 4);
   overflow: hidden;
   -webkit-box-orient: vertical;
-  -webkit-line-clamp: 6;
+  -webkit-line-clamp: 4;
   overflow-wrap: anywhere;
   word-break: break-word;
 }
 
-.skill-control-card__meta {
-  display: -webkit-box;
-  min-height: calc(1.25rem * 3);
-  overflow: hidden;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 3;
-}
-
 .skill-control-card__button {
   width: 100%;
+  min-height: 2.75rem;
+}
+
+.skill-switch {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  z-index: 1;
 }
 
 .resolved-row {
@@ -482,13 +503,13 @@ onMounted(() => {
 
 @media (min-width: 640px) {
   .skill-control-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: repeat(1, minmax(0, 1fr));
   }
 }
 
 @media (min-width: 1024px) {
   .skill-control-grid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
@@ -501,7 +522,7 @@ onMounted(() => {
 
 @media (min-width: 1536px) {
   .skill-control-grid {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
 

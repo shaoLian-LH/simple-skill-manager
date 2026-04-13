@@ -3,6 +3,7 @@ import { computed, onMounted, ref } from 'vue';
 
 import PageSearchBar from '../components/PageSearchBar.vue';
 import PageStatePanel from '../components/PageStatePanel.vue';
+import SkillToggleSwitch from '../components/SkillToggleSwitch.vue';
 import { apiRequest } from '../lib/api';
 import { useSetQuickActions, useWorkspaceSpine } from '../lib/chrome';
 import { asBoolean, asRecord, asString, asStringArray } from '../lib/coerce';
@@ -205,6 +206,10 @@ function isFlipped(cardKey: string): boolean {
   return flippedCards.value.has(cardKey);
 }
 
+function projectPathLabel(project: ProjectIntersectionView): string {
+  return getLastPathSegment(project.fullPath) || project.displayLabel;
+}
+
 function toggleCard(cardKey: string): void {
   const next = new Set(flippedCards.value);
   if (next.has(cardKey)) {
@@ -361,21 +366,14 @@ onMounted(() => {
             @click="toggleCard(card.key)"
             @keydown="onCardKeydown($event, card.key)"
           >
-            <button
-              type="button"
+            <SkillToggleSwitch
               class="skill-switch"
-              :class="{ 'skill-switch--enabled': card.globalEnabled }"
-              role="switch"
-              :aria-checked="card.globalEnabled"
+              :checked="card.globalEnabled"
               :aria-label="`${card.name}: ${card.globalEnabled ? t('common.disable') : t('common.enable')}`"
               :disabled="isCardPending(card.key)"
-              @keydown.stop
-              @click.stop="toggleSkill(card)"
-            >
-              <span class="skill-switch__track" :class="{ 'skill-switch__track--pending': isCardPending(card.key) }" aria-hidden="true">
-                <span class="skill-switch__knob" />
-              </span>
-            </button>
+              :pending="isCardPending(card.key)"
+              @toggle="toggleSkill(card)"
+            />
 
             <h4 class="font-display text-2xl text-charcoal skill-card-title" :title="card.name">{{ card.name }}</h4>
 
@@ -424,7 +422,7 @@ onMounted(() => {
             <div class="skill-back-list-grid">
               <section class="skill-back-section">
                 <h5 class="subsection-heading">{{ t('skills.directProjects') }}</h5>
-                <ul v-if="card.directProjects.length > 0" class="skill-back-section__scroller">
+                <ul v-if="card.directProjects.length > 0" class="skill-back-section__scroller" @click.stop>
                   <li
                     v-for="project in card.directProjects"
                     :key="`direct-${card.key}-${project.id}`"
@@ -438,7 +436,7 @@ onMounted(() => {
                       @keydown.stop
                       @click.stop="openProjectLocation(card, project)"
                     >
-                      {{ isProjectPending(`${card.key}::${project.id}`) ? t('common.opening') : project.displayLabel }}
+                      {{ isProjectPending(`${card.key}::${project.id}`) ? t('common.opening') : projectPathLabel(project) }}
                     </button>
                   </li>
                 </ul>
@@ -449,7 +447,7 @@ onMounted(() => {
 
               <section class="skill-back-section">
                 <h5 class="subsection-heading">{{ t('common.viaPreset') }}</h5>
-                <ul v-if="card.viaPresetProjects.length > 0" class="skill-back-section__scroller">
+                <ul v-if="card.viaPresetProjects.length > 0" class="skill-back-section__scroller" @click.stop>
                   <li
                     v-for="project in card.viaPresetProjects"
                     :key="`preset-${card.key}-${project.id}`"
@@ -463,9 +461,9 @@ onMounted(() => {
                       @keydown.stop
                       @click.stop="openProjectLocation(card, project)"
                     >
-                      {{ isProjectPending(`${card.key}::${project.id}`) ? t('common.opening') : project.displayLabel }}
+                      {{ isProjectPending(`${card.key}::${project.id}`) ? t('common.opening') : projectPathLabel(project) }}
                     </button>
-                    <p v-if="project.note" class="mt-2 text-xs leading-5 text-muted">{{ project.note }}</p>
+                    <p v-if="project.note" class="skill-project-row__note">{{ project.note }}</p>
                   </li>
                 </ul>
                 <p v-else class="mt-2 text-sm text-muted">
@@ -526,6 +524,7 @@ onMounted(() => {
   inset: 0;
   transform: rotateY(180deg);
   overflow: hidden;
+  gap: 1rem;
 }
 
 .skill-card-title {
@@ -577,30 +576,34 @@ onMounted(() => {
   display: grid;
   flex: 1;
   min-height: 0;
-  gap: 1rem;
+  gap: 0.875rem;
   margin-top: 1rem;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: repeat(2, minmax(0, 1fr));
 }
 
 .skill-back-section {
   display: flex;
   min-height: 0;
   flex-direction: column;
-  background: #f5f5f5;
-  border-radius: 0.75rem;
-  padding: 1rem;
-  box-shadow: inset 0 0 0 1px rgba(34, 42, 53, 0.08);
+  padding: 0;
 }
 
 .skill-back-section__scroller {
-  margin-top: 0.75rem;
+  margin-top: 0.625rem;
   flex: 1;
   min-height: 0;
   overflow-y: auto;
+  overflow-x: hidden;
   display: flex;
   flex-direction: column;
-  gap: 0.625rem;
+  gap: 0;
   scrollbar-width: none;
   -ms-overflow-style: none;
+  border-top: 1px solid rgba(34, 42, 53, 0.08);
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  touch-action: pan-y;
 }
 
 .skill-back-section__scroller::-webkit-scrollbar {
@@ -608,11 +611,9 @@ onMounted(() => {
 }
 
 .skill-project-row {
-  border-radius: 0.75rem;
-  background: #ffffff;
-  padding: 0.75rem;
+  padding: 0.75rem 0;
   color: #242424;
-  box-shadow: inset 0 0 0 1px rgba(34, 42, 53, 0.08);
+  border-bottom: 1px solid rgba(34, 42, 53, 0.08);
 }
 
 .skill-related-project-button {
@@ -632,6 +633,13 @@ onMounted(() => {
   text-underline-offset: 0.22rem;
 }
 
+.skill-project-row__note {
+  margin-top: 0.25rem;
+  font-size: 0.75rem;
+  line-height: 1.4;
+  color: #6b7280;
+}
+
 .skill-related-project-button:hover:not(:disabled) {
   color: #111111;
   text-decoration-color: rgba(0, 153, 255, 0.9);
@@ -647,12 +655,6 @@ onMounted(() => {
   top: 1rem;
   right: 1rem;
   z-index: 1;
-}
-
-@media (min-width: 768px) {
-  .skill-back-list-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
 }
 
 @media (max-width: 767px), (prefers-reduced-motion: reduce) {
